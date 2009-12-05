@@ -1,0 +1,7 @@
+//ªÒµ√√Î
+function getSec($date){
+	$d = str_replace(":","-",$date);
+	$d = str_replace(" ","-",$d);
+	$d = split("-",$d);
+	return mktime($d[3],$d[4],$d[5],$d[1],$d[2],$d[0]);
+}

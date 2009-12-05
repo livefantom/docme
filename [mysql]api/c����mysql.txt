@@ -1,0 +1,229 @@
+基于MySQL的高性能数据库应用开发(使用C连接Mysql) 
+作者：sonymusic 中国PHP联盟 (2005-04-08 16:47:25) 
+
+ 
+ 
+
+一、高性能数据库的选择
+
+
+---- 在数据库的应用开发中，常常会遇到性能和代价的之间矛盾。以作者在开发股市行 
+情查询和交易系统中遇到的问题为例，要在实时记录1000多只股票每分钟更新一次的行 
+情数据的同时，响应大量并发用户的数据查询请求。考虑到性价比和易维护性，系统又 
+要求在基于PC服务器，Windows NT平台的软硬件环境下实现。开始，我们采用了MS SQL 
+Server 6.5 作为数据库系统，用Visual C++ 6.0开发了访问数据库的前端，应用ODBC 
+数据接口，在进行了大量的数据库配置和程序优化后，发现仍不能满足性能要求。后采 
+用SQL Server的DB-Library接口，绕过了ODBC解释层，可以每秒更新行情数据30次，同 
+时支持20－30个左右的并发用户进行行情查询，基本满足要求（单台PC服务器，单PII3 
+50 CPU，内存128M，SCSI硬盘）。有没有可能进一步提高系统的性能和负载能力呢？经 
+过分析，数据库服务器是系统的瓶颈。当然，可以采用UNIX服务器＋大型数据库的系统 
+平台，但其开发、运行、维护的费用比微机＋Windows NT平台的费用高出数倍。我们在 
+其它一些系统的开发中，也经常遇到这样的矛盾。如何在微机平台上建立大容量、高效 
+率、易维护、高性价比的数据库系统呢？ 
+---- 考察国内基于微机平台的数据库应用系统，典型的如网易的分布式邮件系统，采用 
+了FreeBSD+MySQL的平台，其容量、负载能力和响应速度都很优秀。作者查阅了MySQL的 
+相关文档，发现MySQL是GNU软件（即OpenSource自由软件）中非常优秀的数据库系统， 
+它完全符合SQL92 （Entry level）和 ODBC（ level 0-2）规范，在符合POSIX规范的操 
+作系统上实现了非常高效的关系型数据库管理系统。根据MySQL提供的文档，它的数据操 
+作堪称所有数据库中最高效的，Benchmark如下表： 
+Reading 2000000 rows by index 
+Database Seconds 
+mysql 367 
+mysql_odbc 464 
+db2_odbc 1206 
+informix_odbc 121126 
+ms-sql_odbc 1634 
+oracle_odbc 20800 
+solid_odbc 877 
+sybase_odbc 17614 
+Inserting (350768) rows 
+Database Seconds 
+mysql 381 
+mysql_odbc 619 
+db2_odbc 3460 
+informix_odbc 2692 
+ms-sql_odbc 4012 
+oracle_odbc 11291 
+solid_odbc 1801 
+sybase_odbc 4802 
+(run on the same NT 4.0 machine) 
+---- 从MySQL的Benchmark中可以看到，MySQL的性能非常出众（当然，测试的MySQL系统 
+可能作了优化，被测数据可能是针对MySQL选择的），而且MySQL提供了对Windows NT的 
+支持。Windows NT＋MySQL能否成为构建高性能数据库应用的理想选择呢？作者用MySQL 
+的数据接口改写了程序，经过一段时间的运行，证明MySQL确实是高效而稳定的数据库， 
+非常适合构建大容量、高效率、易维护、高性价比的数据库应用系统。现将MySQL的安装 
+、运行、开发的心得与大家共享。 
+
+二、MySQL的安装和运行 
+---- 首先从http://www.mysql.com/（国内用户可以从http://www.freecode.com.cn/m 
+irror/mysql/）下载MySQL的执行代码及源代码。注意，Windows NT用户要选择NT下的执 
+行代码，我下载的是mysql-shareware-3.22.32-win.zip。解包后执行Setup，按屏幕提 
+示即可完成安装。 
+---- 拷贝MySQL根目录（c:\mysql）下的my-example.cnf到c:\my.cnf，按文件中的提示 
+编辑my.cnf（如果MySQL的根目录是c:\mysql，可暂不改动my.cnf）。在NT的控制台窗口 
+中，进入MySQL的执行目录（c:\mysql\bin），执行 
+---- C:\mysql\bin\mysqld-shareware --standalone 
+---- 则MySQL的数据库引擎启动。打开另一NT控制台窗口，执行 
+---- C:\mysql\bin\mysql mysql 
+---- 建立数据库连接，出现“mysql>”提示符后，执行 
+---- mysql > DELETE FROM user WHERE Host='localhost' AND User=''; 
+---- mysql > QUIT 
+---- 删除所有的非授权用户。 
+---- 然后执行 
+---- C:\mysql\bin\mysqladmin reload 
+---- C:\mysql\bin\mysqladmin -u root password your_password 
+---- 其中，your_password是你选择的数据库管理员的口令，必须妥善保管。 
+---- 如果要每次都以管理员身份连接数据库，则编辑c:\my.cnf，在[client]段中加入 
+： 
+user=root 
+password= your_password 
+如果要停止MySQL的数据库引擎，可以执行 
+C:\mysql\bin\mysqladmin -u=root -p shutdown 
+按提示输入管理员口令后，MySQL的数据库引擎停止。 
+
+三、MySQL客户端应用的开发 
+---- MySQL提供了丰富的数据接口API，包括C、C++、Perl、PHP、Python、TCL等API和 
+JDBC，ODBC接口。出于性能考虑，我们采用了MySQL的C API进行开发。现以Visual C++ 
+环境为例，作一简单介绍。 
+---- 新建一Win32 Console Application的Project，把“c:\mysql\include”添加到编 
+译选项的包含路径中（在Project Options中加入 /I "d:\mysql\include&quounter.cgol.net 魈迦缦拢?
+#include <windows.h> 
+#include <stdio.h> 
+#include <string.h> 
+#include <mysql.h> 
+int main( int argc, char * argv[] ) 
+{ 
+	char szTargetDSN[] = "test"; 
+	char szSqlText[500]=""; 
+	char aszFlds[ 25 ][ 25 ]; 
+	MYSQL * myData ; 
+	MYSQL_RES * res ; 
+	MYSQL_FIELD * fd ; 
+	MYSQL_ROW row ; 
+	int i,j,k; 
+	BOOL bCreate ＝ TRUE; 
+	if ( (myData = mysql_init((MYSQL*) 0)) 
+			//初始化数据结构 
+			&& mysql_real_connect( myData, NULL, 
+				//连接数据库 
+				"root", " your_password ", szTargetDSN, 
+				MYSQL_PORT, NULL, 0 ) ) 
+	{ 
+		if(bCreate) 
+		{ 
+			sprintf(szSqlText, //构造SQL语句 
+					"create table mytable " 
+					//新建一张表 
+					"(time datetime, s1 char(6), " 
+					"s2 char(11), s3 int, s4 int)"); 
+			if (mysql_query( myData, szSqlText)) 
+				//执行SQL语句 
+			{//执行SQL语句出错 
+				ErrLog( "Can't create table") ; 
+				mysql_close( myData ) ; 
+				return FALSE ; 
+			} 
+		} 
+		sprintf(szSqlText, 
+				"insert into mytable " 
+				//向表中插入数据 
+				"values('2000-3-10 21:01:30'," 
+				//注意时间的格式 
+				"'Test','MySQLTest',2000,3)"); 
+		if (mysql_query( myData, szSqlText)) 
+		{//执行SQL语句出错 
+			ErrLog( "Can't insert data to table") ; 
+			mysql_close( myData ) ; 
+			return FALSE ; 
+		} 
+		sprintf(szSqlText, "select * from mytable "); 
+		if (mysql_query( myData, szSqlText)) 
+			//进行数据检索 
+		{ 
+			//执行SQL语句出错 
+			mysql_close( myData ) ; 
+			return FALSE ; 
+		} 
+		else 
+		{ 
+			res = mysql_store_result( myData ) ; 
+			//取得查询结果 
+			i = (int) mysql_num_rows( res ) ; 
+			//取得有效记录数 
+			printf( "Query: %s\n%ld records found: 
+					\n", szSqlText, i ) ; 
+				for ( i = 0 ; fd = mysql_fetch_field( res ) ; 
+						i++ ) 
+					strcpy( aszFlds[ i ], fd->name ) ; 
+			//取得各字段名 
+			for (i=1; row = mysql_fetch_row( res ); ) 
+				//依次读取各条记录 
+			{
+				j = mysql_num_fields( res ) ; 
+				//取得记录中的字段数 
+				printf( "Record #%ld:-\n", i++ ) ; 
+				for ( k = 0 ; k < j ; k++ ) 
+					//输出各字段的值 
+					printf( " Fld #%d (%s): %s\n", k + 1, aszFlds[ k ], 
+							(((row[k]==NULL)|| 
+							  (!strlen(row[k])))?"NULL":row[k])) ; 
+				puts( "==============================\n" ) ; 
+			} 
+			mysql_free_result( res ) ; 
+		} 
+	} 
+	else 
+	{//连接数据库出错 
+		ErrLog( "Can't connect to the mysql server ") ; 
+		mysql_close( myData ) ; 
+		return FALSE ; 
+	} 
+	mysql_close( myData ) ; 
+	return TRUE ; 
+} 
+
+---- 对其中几个函数作简单说明，详细说明，可参考MySQL文档： 
+---- 1. MYSQL *mysql_init(MYSQL *mysql) 
+---- 初始化一个类型为MYSQL的数据结构，为执行mysql_real_connect()做准备。参数 
+mysql为指向该结构的指针，如果mysql为NULL，则新建并初始化一个MYSQL的数据结构。 
+新建的结构将在mysql_close()中释放。 
+---- 若成功，返回初始化的MYSQL数据结构的指针，否则返回NULL。 
+---- 2. MYSQL *mysql_real_connect(MYSQL *mysql, const char *host, 
+---- const char *user, const char *passwd, const char *db, 
+---- unsigned int port, const char *unix_socket, unsigned int client_flag) 
+---- 与MySQL数据库引擎建立连接。在执行进一步的数据操作之前，必须保证mysql_re 
+al_connect()成功返回。 
+---- 参数mysql是mysql_init()的返回值； 
+---- 参数host是运行MySQL数据库引擎的机器的TCP/IP主机名，如为NULL则默认为“lo 
+calhost”； 
+---- 参数user和passwd是MySQL数据库的合法用户和口令； 
+---- 参数db是连接的数据库名； 
+---- 参数port，unix_socket和client_flag一般取默认值。 
+---- 3. int mysql_query(MYSQL *mysql, const char *query) 
+---- 执行query字符串中的SQL语句，query必须以0结尾。如果成功，返回0。 
+---- 4. MYSQL_RES *mysql_store_result(MYSQL *mysql) 
+---- 返回SELECT，SHOW，DESCRIBE, EXPLAIN等语句执行的结果。函数新建一个MYSQL_ 
+RES的数据结构，把结果存储在该结构中。如果查询没有匹配的结果，则返回空数据集。 
+处理完结果集后，必须调用mysql_free_result()。 
+---- 如果出错，返回NULL，否则返回MYSQL_RES结构的指针。 
+---- 5. MYSQL_ROW mysql_fetch_row(MYSQL_RES *result) 
+---- 取回结果集中的下一条记录，如果没有记录或出错，返回NULL。一条记录中的字段 
+数可以用mysql_num_fields(result)获得，各字段的值可以用row[0] 到 row[mysql_nu 
+m_fields(result)-1]的数组来访问。 
+---- 在工程的链接选项中，加入c:\mysql\lib\libmysql.lib的接口库，把libmysql.d 
+ll复制到操作系统的system目录下（c:\winnt\system32），就可以编译运行了。 
+---- 到这里，一个简单的数据库应用就开发完成了。当然，MySQL有一套功能丰富的AP 
+I，大家可以查看文档。另外，如果需要跨平台的移植性，可以考虑用MySQL的ODBC接口 
+。可以自己配置MySQL的ODBC连接属性，也可以下载myodbc-2.50.29-nt.zip工具包来配 
+置。 
+
+四、总结
+---- 作者用MySQL在Windows NT上构建了高性能、高稳定性的数据库系统。这样，既可 
+以利用Windows NT和Visual C++的友好界面，又可以获得MySQL的强大功能。实践证明， 
+这种方案成本低（别忘了MySQL是免费的）、效率高、开发周期短、运行稳定（MySQL的 
+稳定性在Yahoo、163、263等站点获得了极高的评价）。 
+---- 目前，我的股市行情查询和交易系统已经获得了每秒钟记录70－100条股票行情数 
+据，同时响应50个并发用户进行数据查询的性能，而系统的开发、运行成本却大幅降低 
+。如果您正为PC上的数据库效率发愁，不妨也来试试MySQL吧。 
+(http://www.fanqiang.com)
+ 

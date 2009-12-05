@@ -1,0 +1,148 @@
+Visual C++ 中调用其他应用程序的方法
+三个SDK函数WinExec， ShellExecute，CreateProcess实现调用其他程序的方法
+
+    三个SDK函数: WinExec， ShellExecute，CreateProcess可以实现调用其他程序的要求，其中以WinExec最为简单，ShellExecute比WinExec灵活一些，CreateProcess最为复杂。
+
+    WinExec 两个参数，前一个指定路径，后一个指定显示方式。
+
+    ShellExecute 可以指定工作目录,并且还可以寻找文件的关联直接打开不用加载与文件关联的应用程序，ShellExecute还可以打开网页，启动相应的邮件关联发送邮件等等。
+
+    CreateProcess 一共有十个参数，不过大部分都可以用NULL代替，它可以指定进程的安全属性，继承信息，类的优先级等等。如果我们要得到足够多的关于新的进程的信息，控制新的进程的细节属性，若要达到这些目的，我们就需要使用CreateProcess函数了。
+
+ 
+三个SDK函数（ WinExec、ShellExec、CrateProcess ）的语法：
+ 
+
+WinExec
+
+这个函数最简单，只有两个参数，原型如下：
+
+ 
+      UINT WinExec(
+
+      LPCSTR lpCmdLine,   // 命令路径
+
+      UINT uCmdShow      // 显示方式
+
+      );
+
+使用方法如下：
+
+WinExec("Notepad.exe", SW_SHOW);  // 打开记事本
+WinExec("D:Program FilesTestTest.exe",SW_SHOWMAXIMIZED); // 以最大化的方式打开Test.exe
+需要注意的是若用 SW_SHOWMAXMIZED 方式去加载一个无最大化按钮的程序，譬如Neterm，Calc 等等，就不会出现正常的 窗体，但是已经被加到任务列表里了。
+ 
+
+ShellExecute
+
+原型如下：
+
+      HINSTANCE ShellExecute(
+
+      HWND hwnd,           //父窗口句柄
+
+      LPCTSTR lpOperation,   //操作, 打开方式 "edit","explore","open","find","print","NULL"
+
+      LPCTSTR lpFile,         //文件名,前面可加路径
+
+      LPCTSTR lpParameters,   //参数
+
+      LPCTSTR lpDirectory,    //默认文件夹
+
+      INT nShowCmd          //显示方式
+
+);
+
+使用方法如下：
+
+ShellExecute(NULL,"open","C:Test.txt",NULL,NULL,SW_SHOWNORMAL); // 打开C:Test.txt 文件
+ShellExecute(NULL, "open", "http://www.google.com", NULL, NULL, SW_SHOWNORMAL); // 打开网页www.google.com
+ShellExecute(NULL,"explore", "D:C++",NULL,NULL,SW_SHOWNORMAL); // 打开目录D:C++
+ShellExecute(NULL,"print","C:Test.txt",NULL,NULL, SW_HIDE); // 打印文件C:Test.txt
+ShellExecute不支持定向输出。
+ 
+
+CreateProcess
+
+原型如下：
+
+      BOOL CreateProcess(
+
+      LPCTSTR lpApplicationName, //执行程序名
+
+      LPTSTR lpCommandLine,  // 参数行
+
+      //下面两个参数描述了所创建的进程和线程的安全属性，如果为NULL则使用默认的安全属性
+
+      LPSECURITY_ATTRIBUTES lpProcessAttributes,  // process security attributes
+
+      LPSECURITY_ATTRIBUTES lpThreadAttributes,   // thread security attributes
+
+      BOOL bInheritHandles,  // 继承标志
+
+      DWORD dwCreationFlags, // 创建标志
+
+      LPVOID lpEnvironment,  // 环境变量
+
+      LPCTSTR lpCurrentDirectory,   // 运行该进程的初始目录
+
+      LPSTARTUPINFO lpStartupInfo,  // 用于在创建子进程时设置各种属性
+
+      LPPROCESS_INFORMATION lpProcessInformation //用于在进程创建后接受相关信息
+
+      ); 
+
+使用方法如下：
+             PROCESS_INFORMATION pi;
+                       STARTUPINFO si;
+                       memset(&si,0,sizeof(si));
+                       si.cb=sizeof(si);
+                      si.wShowWindow=SW_SHOW;
+                       si.dwFlags=STARTF_USESHOWWINDOW;
+                       bool fRet=CreateProcess("D:putty.exe",NULL,NULL,FALSE,NULL,NULL,NULL,NULL,&si,&pi);
+ 
+
+可以看出，通过上面的几个不同的方法，都可以实现在应用程序中打开其他应用程序的目的，其中有些方法可能会麻烦一点，所以就需要我们根据不同的目的去选择最适合自己的方法去实现自己的目的！
+
+ 
+
+ 
+
+关于三个SDK函数: WinExec， ShellExecute，CreateProcess 的其他注意事项：
+
+1、定义头文件
+
+在头文件stdafx.h中必须定义以下两个头文件：
+
+#include <shlobj.h> // 可替换为 windows.h
+#include <shellapi.h>
+如果定义了头文件 #include <windows.h>的话就不必定义 #include <shlobj.h>了，"windows.h" 不光是包含了"shellapi.h"，它还定义了许多数据类型，如果没有这些数据类型，shellapi.h本身会出错。
+ 
+2、定义路径
+
+C++中所表示的路径要用 " "而不是平常所用的" "，所以以上三个函数表示路径都为：
+
+Disk:Directory...File name
+
+WinExec("D:Program FilesTestTest.exe",SW_SHOWMAXIMIZED);
+
+ShellExecute(NULL,"open","C:Test.txt",NULL,NULL,SW_SHOWNORMAL);
+bool fRet=CreateProcess("D:putty.exe",NULL,NULL,FALSE,NULL,NULL,NULL,NULL,&si,&pi);
+
+
+
+
+-------------------------------------------------------------------------------------------------------------------------------
+
+    你可以使用Windows API函数WinExec、ShellExecute。这两个函数可以调用Windows和DOS程序。WinExec主要运行EXE文件。如： 
+    WinExec("Notepad.exe Readme.txt", SW_SHOW); 
+    ShellExecute不仅可以运行EXE文件，也可以运行已经关联的文件。如： 
+    ShellExecute(0, "open", "http://askpro.yeah.net", NULL, NULL, 0); 
+
+
+
+    其实使用ShellExecute调用DOS程序时可以不显示窗口，如： 
+    ShellExecute(0, "open", "c:\\tools\\arj.exe", "a c:\\p.arj c:\\*.bat c:\\*.sys", NULL, SW_HIDE); 
+    对于你的问题，你可以使用FindWindow获得句柄，但关掉窗口就不能再继续执行了。而你说的关闭窗口还能执行，大概是因为在你关闭窗口时已经运行结束了。 
+
+

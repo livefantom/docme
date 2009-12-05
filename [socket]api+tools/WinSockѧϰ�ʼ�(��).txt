@@ -1,0 +1,263 @@
+WinSock学习笔记（二）
+
+
+作者：肖进
+
+
+
+
+
+ 与socket有关的一些函数介绍
+
+1、读取当前错误值：每次发生错误时，如果要对具体问题进行处理，那么就应该调用这个函数取得错误代码。 
+
+      int  WSAGetLastError(void );
+      #define h_errno   WSAGetLastError()
+
+错误值请自己阅读Winsock2.h。
+
+2、将主机的unsigned long值转换为网络字节顺序(32位)：为什么要这样做呢？因为不同的计算机使用不同的字节顺序存储数据。因此任何从Winsock函数对IP地址和端口号的引用和传给Winsock函数的IP地址和端口号均时按照网络顺序组织的。
+      u_long  htonl(u_long hostlong);
+      举例：htonl(0)=0
+      htonl(80)= 1342177280
+
+3、将unsigned long数从网络字节顺序转换位主机字节顺序，是上面函数的逆函数。       u_long  ntohl(u_long netlong);
+      举例：ntohl(0)=0
+      ntohl(1342177280)= 80
+
+4、将主机的unsigned short值转换为网络字节顺序(16位)：原因同2：       u_short  htons(u_short hostshort);
+      举例：htonl(0)=0
+      htonl(80)= 20480
+
+5、将unsigned short数从网络字节顺序转换位主机字节顺序，是上面函数的逆函数。       u_short  ntohs(u_short netshort);
+      举例：ntohs(0)=0
+      ntohsl(20480)= 80
+
+6、将用点分割的IP地址转换位一个in_addr结构的地址，这个结构的定义见笔记(一)，实际上就是一个unsigned long值。计算机内部处理IP地址可是不认识如192.1.8.84之类的数据。       unsigned long  inet_addr( const char FAR * cp );
+      举例：inet_addr("192.1.8.84")=1409810880
+      inet_addr("127.0.0.1")= 16777343
+
+如果发生错误，函数返回INADDR_NONE值。
+
+7、将网络地址转换位用点分割的IP地址，是上面函数的逆函数。       char FAR *  inet_ntoa( struct in_addr in );
+      举例：char * ipaddr=NULL;
+      char addr[20];
+      in_addr inaddr;
+      inaddr. s_addr=16777343;
+      ipaddr= inet_ntoa(inaddr);
+      strcpy(addr,ipaddr); 
+这样addr的值就变为127.0.0.1。
+注意意不要修改返回值或者进行释放动作。如果函数失败就会返回NULL值。
+
+8、获取套接字的本地地址结构：       int  getsockname(SOCKET s, struct sockaddr FAR * name, int FAR * namelen );
+      s为套接字
+      name为函数调用后获得的地址值
+      namelen为缓冲区的大小。
+ 
+9、获取与套接字相连的端地址结构：
+      int  getpeername(SOCKET s, struct sockaddr FAR * name, int FAR * namelen );
+      s为套接字
+      name为函数调用后获得的端地址值
+      namelen为缓冲区的大小。
+ 
+10、获取计算机名：
+      int  gethostname( char FAR * name, int namelen );
+      name是存放计算机名的缓冲区
+      namelen是缓冲区的大小
+      用法：
+      char szName[255];
+      memset(szName,0,255);
+      if(gethostname(szName,255)==SOCKET_ERROR)
+      {
+      		//错误处理
+      }
+      返回值为：szNmae="xiaojin"
+ 
+11、根据计算机名获取主机地址：       struct hostent FAR *  gethostbyname( const char FAR * name );
+
+      name为计算机名。
+      用法：
+      hostent * host;
+      char* ip;
+      host= gethostbyname("xiaojin");
+      if(host->h_addr_list[0])
+      {
+	      struct in_addr addr;
+    	  memmove(&addr, host->h_addr_list[0]，4);
+	      //获得标准IP地址
+	      ip=inet_ ntoa (addr);
+      }
+
+      返回值为：hostent->h_name="xiaojin"
+          hostent->h_addrtype=2    //AF_INET
+          hostent->length=4
+          ip="127.0.0.1"
+ 
+ Winsock 的I/O操作：
+
+1、 两种I/O模式 
+阻塞模式：执行I/O操作完成前会一直进行等待，不会将控制权交给程序。套接字 默认为阻塞模式。可以通过多线程技术进行处理。 
+非阻塞模式：执行I/O操作时，Winsock函数会返回并交出控制权。这种模式使用 起来比较复杂，因为函数在没有运行完成就进行返回，会不断地返回 WSAEWOULDBLOCK错误。但功能强大。
+为了解决这个问题，提出了进行I/O操作的一些I/O模型,下面介绍最常见的三种：
+
+2、select模型：
+
+　　通过调用select函数可以确定一个或多个套接字的状态，判断套接字上是否有数据，或
+者能否向一个套接字写入数据。       int  select( int nfds, fd_set FAR * readfds, fd_set FAR * writefds, 
+      fd_set FAR *exceptfds, const struct timeval FAR * timeout );
+      
+◆先来看看涉及到的结构的定义：
+a、 d_set结构：
+#define FD_SETSIZE 64?
+typedef struct fd_set {
+u_int fd_count; /* how many are SET? */
+SOCKET fd_array[FD_SETSIZE]; /* an array of SOCKETs */
+} fd_set;      
+fd_count为已设定socket的数量
+fd_array为socket列表，FD_SETSIZE为最大socket数量，建议不小于64。这是微软建
+议的。
+
+B、timeval结构： struct timeval {
+long tv_sec; /* seconds */
+long tv_usec; /* and microseconds */
+};
+
+tv_sec为时间的秒值。
+tv_usec为时间的毫秒值。
+这个结构主要是设置select()函数的等待值，如果将该结构设置为(0,0)，则select()函数
+会立即返回。
+
+◆再来看看select函数各参数的作用： 
+nfds：没有任何用处，主要用来进行系统兼容用，一般设置为0。
+
+readfds：等待可读性检查的套接字组。
+
+writefds；等待可写性检查的套接字组。
+
+exceptfds：等待错误检查的套接字组。
+
+timeout：超时时间。
+
+函数失败的返回值：调用失败返回SOCKET_ERROR,超时返回0。
+readfds、writefds、exceptfds三个变量至少有一个不为空，同时这个不为空的套接字组
+种至少有一个socket，道理很简单，否则要select干什么呢。 举例：测试一个套接字是否可读：fd_set fdread;
+//FD_ZERO定义
+// #define FD_ZERO(set) (((fd_set FAR *)(set))->fd_count=0)
+FD_ZERO(&fdread);
+FD_SET(s,&fdread)； //加入套接字，详细定义请看winsock2.h
+if(select(0,%fdread,NULL,NULL,NULL)>0
+{
+	//成功
+	if(FD_ISSET(s,&fread) //是否存在fread中，详细定义请看winsock2.h
+	{
+		//是可读的
+	}
+}
+◆I/O操作函数：主要用于获取与套接字相关的操作参数。 
+
+ int  ioctlsocket(SOCKET s, long cmd, u_long FAR * argp );     
+s为I/O操作的套接字。
+cmd为对套接字的操作命令。
+argp为命令所带参数的指针。
+
+常见的命令： //确定套接字自动读入的数据量
+#define FIONREAD _IOR(''''f'''', 127, u_long) /* get # bytes to read */
+//允许或禁止套接字的非阻塞模式，允许为非0，禁止为0
+#define FIONBIO _IOW(''''f'''', 126, u_long) /* set/clear non-blocking i/o */
+//确定是否所有带外数据都已被读入
+#define SIOCATMARK _IOR(''''s'''', 7, u_long) /* at oob mark? */
+
+3、WSAAsynSelect模型：
+WSAAsynSelect模型也是一个常用的异步I/O模型。应用程序可以在一个套接字上接收以
+WINDOWS消息为基础的网络事件通知。该模型的实现方法是通过调用WSAAsynSelect函
+数 自动将套接字设置为非阻塞模式，并向WINDOWS注册一个或多个网络时间，并提供一
+个通知时使用的窗口句柄。当注册的事件发生时，对应的窗口将收到一个基于消息的通知。
+      int  WSAAsyncSelect( SOCKET s, HWND hWnd, u_int wMsg, long lEvent);       
+s为需要事件通知的套接字
+hWnd为接收消息的窗口句柄
+wMsg为要接收的消息
+lEvent为掩码，指定应用程序感兴趣的网络事件组合，主要如下： #define FD_READ_BIT 0
+#define FD_READ (1 << FD_READ_BIT)
+#define FD_WRITE_BIT 1
+#define FD_WRITE (1 << FD_WRITE_BIT)
+#define FD_OOB_BIT 2
+#define FD_OOB (1 << FD_OOB_BIT)
+#define FD_ACCEPT_BIT 3
+#define FD_ACCEPT (1 << FD_ACCEPT_BIT)
+#define FD_CONNECT_BIT 4
+#define FD_CONNECT (1 << FD_CONNECT_BIT)
+#define FD_CLOSE_BIT 5
+#define FD_CLOSE (1 << FD_CLOSE_BIT)
+
+用法：要接收读写通知：int nResult= WSAAsyncSelect(s,hWnd,wMsg,FD_READ|FD_WRITE)；
+if(nResult==SOCKET_ERROR)
+{
+	//错误处理
+}
+
+取消通知：
+      int nResult= WSAAsyncSelect(s,hWnd,0，0)； 
+
+当应用程序窗口hWnd收到消息时，wMsg.wParam参数标识了套接字，lParam的低字标明
+了网络事件，高字则包含错误代码。
+
+4、WSAEventSelect模型
+WSAEventSelect模型类似WSAAsynSelect模型，但最主要的区别是网络事件发生时会被发
+送到一个事件对象句柄，而不是发送到一个窗口。
+
+使用步骤如下：
+a、 创建事件对象来接收网络事件：
+#define WSAEVENT HANDLE
+#define LPWSAEVENT LPHANDLE
+WSAEVENT WSACreateEvent( void );
+
+该函数的返回值为一个事件对象句柄，它具有两种工作状态：已传信(signaled)和未传信
+(nonsignaled)以及两种工作模式：人工重设(manual reset)和自动重设(auto reset)。默认未
+未传信的工作状态和人工重设模式。
+
+b、将事件对象与套接字关联，同时注册事件，使事件对象的工作状态从未传信转变未
+已传信。
+      int  WSAEventSelect( SOCKET s,WSAEVENT hEventObject,long lNetworkEvents );  
+s为套接字
+hEventObject为刚才创建的事件对象句柄
+lNetworkEvents为掩码，定义如上面所述
+
+c、I/O处理后，设置事件对象为未传信BOOL WSAResetEvent( WSAEVENT hEvent );
+Hevent为事件对象
+
+成功返回TRUE，失败返回FALSE。
+
+d、等待网络事件来触发事件句柄的工作状态：
+
+DWORD WSAWaitForMultipleEvents( DWORD cEvents,
+const WSAEVENT FAR * lphEvents, BOOL fWaitAll,
+DWORD dwTimeout, BOOL fAlertable );
+lpEvent为事件句柄数组的指针
+cEvent为为事件句柄的数目，其最大值为WSA_MAXIMUM_WAIT_EVENTS 
+fWaitAll指定等待类型：TRUE：当lphEvent数组重所有事件对象同时有信号时返回；
+FALSE：任一事件有信号就返回。
+dwTimeout为等待超时（毫秒）
+fAlertable为指定函数返回时是否执行完成例程
+
+对事件数组中的事件进行引用时，应该用WSAWaitForMultipleEvents的返回值，减去
+预声明值WSA_WAIT_EVENT_0，得到具体的引用值。例如：
+
+nIndex=WSAWaitForMultipleEvents(…);
+MyEvent=EventArray[Index- WSA_WAIT_EVENT_0];
+e、判断网络事件类型：
+
+int WSAEnumNetworkEvents( SOCKET s,
+WSAEVENT hEventObject, LPWSANETWORKEVENTS lpNetworkEvents );
+s为套接字
+hEventObject为需要重设的事件对象
+lpNetworkEvents为记录网络事件和错误代码，其结构定义如下：
+
+typedef struct _WSANETWORKEVENTS {
+	long lNetworkEvents;
+	int iErrorCode[FD_MAX_EVENTS];
+} WSANETWORKEVENTS, FAR * LPWSANETWORKEVENTS;
+f、关闭事件对象句柄：
+
+BOOL WSACloseEvent(WSAEVENT hEvent);
+调用成功返回TRUE，否则返回FALSE。
+　

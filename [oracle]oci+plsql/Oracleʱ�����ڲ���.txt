@@ -1,0 +1,65 @@
+Oracle关于时间/日期的操作 
+
+1.日期时间间隔操作 
+
+当前时间减去7分钟的时间
+select  sysdate,sysdate - interval '7' MINUTE  from dual
+当前时间减去7小时的时间
+select  sysdate - interval '7' hour  from dual
+当前时间减去7天的时间
+select  sysdate - interval '7' day  from dual
+当前时间减去7月的时间
+select  sysdate,sysdate - interval '7' month from dual
+当前时间减去7年的时间
+select  sysdate,sysdate - interval '7' year   from dual
+时间间隔乘以一个数字
+select  sysdate,sysdate - 8 *interval '2' hour   from dual
+
+2.日期到字符操作 
+
+select  sysdate,to_char(sysdate,'yyyy-mm-dd hh24:mi:ss')  from dual
+select  sysdate,to_char(sysdate,'yyyy-mm-dd hh:mi:ss')  from dual
+select  sysdate,to_char(sysdate,'yyyy-ddd hh:mi:ss')  from dual
+select  sysdate,to_char(sysdate,'yyyy-mm iw-d hh:mi:ss')  from dual
+   参考oracle的相关关文档(ORACLE901DOC/SERVER.901/A90125/SQL_ELEMENTS4.HTM#48515)
+
+3. 字符到日期操作
+
+select  to_date('2003-10-17 21:15:37','yyyy-mm-dd hh24:mi:ss') from dual
+具体用法和上面的to_char差不多。
+
+4. trunk/ ROUND函数的使用 
+
+select  trunc(sysdate ,'YEAR')  from dual
+select  trunc(sysdate )  from dual
+select  to_char(trunc(sysdate ,'YYYY'),'YYYY')  from  dual
+
+5.oracle有毫秒级的数据类型
+
+--返回当前时间 年月日小时分秒毫秒
+select to_char(current_timestamp(5),'DD-MON-YYYY HH24:MI:SSxFF') from dual; 
+--返回当前 时间的秒毫秒，可以指定秒后面的精度(最大=9)
+select to_char(current_timestamp(9),'MI:SSxFF') from dual; 
+
+6.计算程序运行的时间(ms) 
+
+declare
+    type rc is ref cursor;
+    l_rc rc;
+    l_dummy all_objects.object_name%type;
+    l_start number default dbms_utility.get_time;
+begin
+    for  I  in 1 .. 1000
+    loop
+        open l_rc for
+          'select object_name  from all_objects '||
+
+'where object_id = ' || i;
+        fetch l_rc into l_dummy;
+        close l_rc;
+    end loop;
+    dbms_output.put_line
+    ( round( (dbms_utility.get_time-l_start)/100, 2 ) ||
+      ' seconds...' );
+end; 
+

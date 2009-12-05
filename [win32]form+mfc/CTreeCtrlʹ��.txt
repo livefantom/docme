@@ -1,0 +1,9 @@
+插入节点
+HTREEITEM	InsertItem(LPCTSTR lpszItem, HTREEITEM hParent = TVI_ROOT, HTREEITEM hInsertAfter = TVI_LAST);//最简单的一个
+
+获取所选节点
+HTREEITEM	GetSelectedItem( ) const;
+
+
+选中节点
+BOOL SelectItem(   HTREEITEM hItem );

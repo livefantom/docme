@@ -1,0 +1,171 @@
+ORACLE SEQUENCE的简单介绍 
+http://www.fanqiang.com (2001-05-14 10:15:00) 
+
+在oracle中sequence就是所谓的序列号，每次取的时候它会自动增加，一般用在需要按序列号排序的地方。  
+1、Create Sequence  
+你首先要有CREATE SEQUENCE或者CREATE ANY SEQUENCE权限，  
+CREATE SEQUENCE emp_sequence  
+    INCREMENT BY 1  -- 每次加几个  
+    START WITH 1    -- 从1开始计数  
+    NOMAXVALUE      -- 不设置最大值  
+    NOCYCLE         -- 一直累加，不循环  
+    CACHE 10;  
+
+一旦定义了emp_sequence，你就可以用CURRVAL，NEXTVAL  
+ CURRVAL=返回 sequence的当前值  
+ NEXTVAL=增加sequence的值，然后返回 sequence 值  
+比如：  
+  emp_sequence.CURRVAL  
+  emp_sequence.NEXTVAL  
+
+可以使用sequence的地方：  
+- 不包含子查询、snapshot、VIEW的 SELECT 语句  
+- INSERT语句的子查询中  
+- NSERT语句的VALUES中  
+- UPDATE 的 SET中    
+
+可以看如下例子：  
+INSERT INTO emp VALUES   
+(empseq.nextval, 'LEWIS', 'CLERK',7902, SYSDATE, 1200, NULL, 20);  
+
+SELECT empseq.currval     FROM DUAL;  
+
+但是要注意的是：  
+- 第一次NEXTVAL返回的是初始值；随后的NEXTVAL会自动增加你定义的INCREMENT BY值，然后返回增加后的值。CURRVAL 总是返回当前SEQUENCE的值，但是在第一次NEXTVAL初始化之后才能使用CURRVAL，否则会出错。一次NEXTVAL会增加一次SEQUENCE的值，所以如果你在同一个语句里面使用多个NEXTVAL，其值就是不一样的。明白？  
+
+- 如果指定CACHE值，ORACLE就可以预先在内存里面放置一些sequence，这样存取的快些。cache里面的取完后，oracle自动再取一组到cache。 使用cache或许会跳号， 比如数据库突然不正常down掉（shutdown abort),cache中的sequence就会丢失. 所以可以在create sequence的时候用nocache防止这种情况。  
+
+2、Alter Sequence  
+你或者是该sequence的owner，或者有ALTER ANY SEQUENCE 权限才能改动sequence. 可以alter除start至以外的所有sequence参数.如果想要改变start值，必须 drop  sequence 再 re-create .  
+Alter sequence 的例子  
+ALTER SEQUENCE emp_sequence  
+    INCREMENT BY 10  
+    MAXVALUE 10000  
+    CYCLE    -- 到10000后从头开始  
+    NOCACHE ;  
+
+
+影响Sequence的初始化参数：  
+SEQUENCE_CACHE_ENTRIES =设置能同时被cache的sequence数目。   
+
+可以很简单的Drop Sequence  
+DROP SEQUENCE order_seq;  
+
+
+好吧，就到这里。   
+ 
+--------------------------------------------------------------------------------------------------------------------------------
+**********************************************************************************************************************************
+--------------------------------------------------------------------------------------------------------------------------------
+
+
+
+Oracle/PLSQL: Sequences (Autonumber)
+
+--------------------------------------------------------------------------------
+
+In Oracle, you can create an autonumber field by using sequences. A sequence is an object in Oracle that is used to generate a number sequence. This can be useful when you need to create a unique number to act as a primary key.
+
+The syntax for a sequence is:
+
+CREATE SEQUENCE sequence_name
+    MINVALUE value
+    MAXVALUE value
+    START WITH value
+    INCREMENT BY value
+    CACHE value;
+
+For example:
+
+CREATE SEQUENCE supplier_seq
+    MINVALUE 1
+    MAXVALUE 999999999999999999999999999
+    START WITH 1
+    INCREMENT BY 1
+    CACHE 20;
+
+This would create a sequence object called supplier_seq. The first sequence number that it would use is 1 and each subsequent number would increment by 1 (ie: 2,3,4,...}. It will cache up to 20 values for performance.
+
+If you omit the MAXVALUE option, your sequence will automatically default to:
+
+MAXVALUE 999999999999999999999999999
+
+So you can simplify your CREATE SEQUENCE command as follows:
+
+CREATE SEQUENCE supplier_seq
+    MINVALUE 1
+    START WITH 1
+    INCREMENT BY 1
+    CACHE 20;
+
+Now that you've created a sequence object to simulate an autonumber field, we'll cover how to retrieve a value from this sequence object. To retrieve the next value in the sequence order, you need to use nextval.
+
+For example:
+
+supplier_seq.nextval
+
+This would retrieve the next value from supplier_seq. The nextval statement needs to be used in an SQL statement. For example:
+
+INSERT INTO suppliers
+(supplier_id, supplier_name)
+VALUES
+(supplier_seq.nextval, 'Kraft Foods');
+
+This insert statement would insert a new record into the suppliers table. The supplier_id field would be assigned the next number from the supplier_seq sequence. The supplier_name field would be set to Kraft Foods.
+
+
+
+Frequently Asked Questions
+
+--------------------------------------------------------------------------------
+
+One common question about sequences is:
+
+Question:  While creating a sequence, what does cache and nocache options mean? For example, you could create a sequence with a cache of 20 as follows:
+
+CREATE SEQUENCE supplier_seq
+    MINVALUE 1
+    START WITH 1
+    INCREMENT BY 1
+    CACHE 20;
+
+
+
+Or you could create the same sequence with the nocache option:
+
+CREATE SEQUENCE supplier_seq
+    MINVALUE 1
+    START WITH 1
+    INCREMENT BY 1
+    NOCACHE;
+
+
+
+Answer:  With respect to a sequence, the cache option specifies how many sequence values will be stored in memory for faster access.
+
+The downside of creating a sequence with a cache is that if a system failure occurs, all cached sequence values that have not be used, will be "lost". This results in a "gap" in the assigned sequence values. When the system comes back up, Oracle will cache new numbers from where it left off in the sequence, ignoring the so called "lost" sequence values.
+
+Note: To recover the lost sequence values, you can always execute an ALTER SEQUENCE command to reset the counter to the correct value.
+
+Nocache means that none of the sequence values are stored in memory. This option may sacrifice some performance, however, you should not encounter a gap in the assigned sequence values.
+
+
+
+--------------------------------------------------------------------------------
+
+Question:  How do we set the LASTVALUE value in an Oracle Sequence?
+
+Answer:  You can change the LASTVALUE for an Oracle sequence, by executing an ALTER SEQUENCE command.
+
+For example, if the last value used by the Oracle sequence was 100 and you would like to reset the sequence to serve 225 as the next value. You would execute the following commands.
+
+alter sequence seq_name
+increment by 124;
+
+select seq_name.nextval from dual;
+
+alter sequence seq_name
+increment by 1;
+
+Now, the next value to be served by the sequence will be 225.
+

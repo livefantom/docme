@@ -1,0 +1,124 @@
+VC中汇制不规则位图方法总结，多种方法实现，全面测试比较 首先要说的是，所谓不规则位图的绘制，意思是说一张位图（位图永远是规则的），上面有个不规则图形，把这张位图绘制到某一界面上时，要求只绘制位图上那个不规则图形，其它地方保持背景不变。比如说画个太阳，不能把太阳所在的矩形的背景全部覆盖，而应该只覆盖太阳部分，本文将全面介绍绘制方法，以及它们的优劣！（我从我的程序中抄过来，并将变量改成通用名字，可能有手误的地方）        我说的这些方法都是在VC中的，VB中应该可以方便的用其它格式的图片如gif，可以为透明，所以本文不针对VB读者。这些问题都是我在CSDN中问而未果的问题，希望给与我有同样迷惑的朋友一点帮助！       程序中的w和h为位图的宽度和高度。 
+
+方法一：       首先把不规则图形以外的地方（即要求是透明的地方），弄成图形中不会出现的颜色（用图像处理软件），如白色，然后用下面的程序：//包函#include "Wingdi.h"//并在工程设置中的link中的对象/库模块中加入：msimg32.lib
+
+CBitmap YourBmp;YourBmp.LoadBitmap(IDB_XXXX); //要显示的位图
+
+CDC* pDC=GetDC();
+
+CDC YourDC;YourDC.CreateCompatibleDC(pDC);YourDC.SelectObject(&Yourbmp);
+
+TransparentBlt(pDC->m_hDC,0,0,w,h,YourDC.m_hDC,0,0,w,h,    RGB(255,255,255) //在位图中视为透明的颜色的RGB值 );
+
+ReleaseDC(pDC);
+
+评价：程序编制简单，但运行速度慢，有闪烁（用一张208*15的位图测试），所以还是不要图方便！
+
+
+方法二：       做一张蒙板位图，大小与要绘制的位图一样，分辨率也一样，让蒙板对应于图形区域的地方为纯白色，其余地方（要求透明的地方）为纯黑色。
+
+CBitmap YourBmp;YourBmp.LoadBitmap(IDB_XXXX); //要显示的位图
+
+CBitmap YourMasker;YourMasker.LoadBitmap(IDB_XXXX); //蒙板位图
+
+CBitmap background;background.LoadBitmap(IDB_XXXX); //背景位图
+
+CDC* pDC=GetDC();
+
+CDC YourDC;YourDC.CreateCompatibleDC(pDC);YourDC.SelectObject(&Yourbmp);
+
+CDC MaskerDC;MaskerDC.CreateCompatibleDC(pDC);MaskerDC.SelectObject(&YourMasker);
+
+CDC backgroundDC;backgroundDC.CreateCompatibleDC(pDC);backgroundDC.SelectObject(&background);
+
+CBitmap TempBitmap; //临时位图TempBitmap.CreateCompatibleBitmap(pDC,w,h);
+
+CDC TempDC;TempDC.CreateCompatibleDC(pDC);
+
+TempDC.SelectObject(&TempBitmap);
+
+TempDC.BitBlt(0,0,w,h,pDC,0,0,SRCCOPY);TempDC.BitBlt(0,0,w,h,&YourDC,0,0,SRCAND);TempDC.BitBlt(0,0,w,h,&MaskerDC,0,0,SRCPAINT);TempDC.BitBlt(0,0,w,h,&YourDC,0,0,SRCAND);pDC->BitBlt(0,0,w,h,&TempDC,0,0,SRCCOPY);
+
+上面5行为核心行，基本算法就是先在临时的TempDC中画好位图（透明区域已表现出来），再一次性的（最后一行）绘制到屏幕，这样防止闪烁，但要多占CPU资源和内存，在我的2.4G CPU上测试，CPU占有率也不到1%（每100毫秒运行一次上面的程序），可以接受。
+
+ReleaseDC(pDC);
+
+评价：程序复杂，但视觉效果较好！
+
+
+方法三：做一张蒙板位图，大小与要绘制的位图一样，分辨率也一样，让蒙板对应于图形区域的地方为纯白色，其余地方（要求透明的地方）为纯黑色。
+
+CBitmap YourBmp;YourBmp.LoadBitmap(IDB_XXXX); //要显示的位图
+
+CBitmap YourMasker;YourMasker.LoadBitmap(IDB_XXXX); //蒙板位图
+
+CDC* pDC=GetDC();
+
+CDC YourDC;YourDC.CreateCompatibleDC(pDC);YourDC.SelectObject(&Yourbmp);
+
+CDC MaskerDC;MaskerDC.CreateCompatibleDC(pDC);MaskerDC.SelectObject(&YourMasker);
+
+pDC->BitBlt(0,0,w,h,&YourDC,0,0,SRCAND);pDC->BitBlt(0,0,w,h,&MaskerDC,0,0,SRCPAINT);pDC->BitBlt(0,0,w,h,&YoureDC,0,0,SRCAND);
+
+ReleaseDC(pDC);
+
+评价：该方法和方法二本质上一样，方法二先把要显示的位图存起来最后一次性显示，方法三则分三步显示位图，所以屏幕上绘制的图像要变化三次才能达到透明的效果，所以还是稍有闪烁，但比方法一好得多，在资源的消耗上比方法三要少，处于折衷位置！推荐使用方法三，它在效率和视觉上都表现的很好，而且window在移动鼠标的时候也是用这种方法，没有任何理由比微软都是这样用的这个理由更充分，毕竟大家都在用他的操作系统！
+
+方法四：       这个立法我没有经过实验，因为没有找到ICO制作工具，方法就是把要显示的位图做成ICO，自定义ICO应该可以自定义大小吧，不太确定，大家都知道ICO可以透明，想哪儿透明就哪儿透明，然后就DrawIcon或DrawImage函数把它绘制上屏幕，如果这个方法可行，那就是最简单的了，只要一行程序！
+
+方法五：       用CreateHatchBrush函数把要显示的位图做成刷子，再把要显示的位图轮廓做成一个区域（要做区域，可以根据位图上的颜色轻松做出来，前提是先把要求为透明的地方弄成位图中不会出现的颜色），再用FillRgn函数用做成的刷子去刷这个区域，最后就达到效果了。该方法应该要求区域是连续的，而且左上角第一点不能为透明，所以应该没有什么实用价值！但我想可以用BitBlt函数来改善这种状况。
+
+
+方法六：        用AlphaBlend函数，以下程序只有在Vc++.net下才能通过，因为使用了透明位图的概念，而2000以前的系统是不理解透明位图的。
+
+//包函#include "Wingdi.h"
+
+CBitmap YourBmp;YourBmp.LoadBitmap(IDB_XXXX); //要显示的位图
+
+CDC* pDC=GetDC();
+
+CDC YourDC;YourDC.CreateCompatibleDC(pDC);YourDC.SelectObject(&YourBmp);
+
+BLENDFUNCTION b;b.BlendOp=AC_SRC_OVER; //定值b.BlendFlags=0; //定值b.SourceConstantAlpha=255; //不用总体透明度，用每一象素点自己的alpha值b.AlphaFormat=AC_SRC_ALPHA; 
+
+//vc++6.0中没有AC_SRC_ALPHA的定义，只有AC_SRC_NO_ALPHA的定义，这正是在vc++6.0中无法使用的原因。
+
+AlphaBlend(pDC->m_hDC,0,0,w,h,GateDC.m_hDC,0,0,w,h,b);
+
+ReleaseDC(pDC);
+
+评价：方法简单，但要求2000以上系统，而且事先必需要做个32位位图并给plpha赋适当的值（以下会讨论），目前我还没有找到一个做32位位图的软件，所以还只有用程序来实现，好在我实现了这样一个函数！
+
+做32位透明位图的方法！        该函数只能把24位转成32位，大家可以改动一下就能转换其它位的位图了，调用函数前，请把需要透明的地方弄成位图中不会出现的颜色，假设为白色。    注：该函数是写给我自己用的，没有作任何错误判断，假设我不会犯错误，如果要想更完美，可以自己加上错误的捕捉。
+
+ BITMAPFILEHEADER bf; BITMAPINFOHEADER bi;
+
+ CFileDialog dlg
+
+(TRUE,NULL,NULL,OFN_HIDEREADONLY|OFN_OVERWRITEPROMPT,"bmp 文件(*.bmp)|*.bmp||"); CString filename; CFile file;
+
+ if(IDOK==dlg.DoModal()) {  filename=dlg.GetPathName();  file.Open(filename,CFile::modeRead | CFile::shareDenyNone); //打开要转换的位图文件  file.Read(&bf,sizeof(bf));  file.Read(&bi,sizeof(bi)); } /////////////////////////////////////////////// UpdateData(); //取得edit框中的输入，edit框与CString变量name相连，该输入作为转换后的输出文件的文件名 CFile Output; Output.Open(name,CFile::modeCreate | CFile::modeWrite,NULL);
+
+ DWORD FImageSize=bi.biSizeImage; //转换前的图像数据大小 DWORD SImageSize=bi.biWidth*bi.biHeight*4; //转换后的图像数据大小
+
+ int SrowByte=bi.biWidth*3; if(SrowByte%4)  SrowByte+=4-SrowByte%4; //以上求转换前一行图像需要的字节数，注意必需是4的倍数，简单来说就是高度相同，208宽和207宽的24位位图的文件大小相等。 //也可以这样求：SrowByte=bi.biSizeImage/bi.biHeight; //注意下面求32位位图一行的字节数时，并没有判断是否是4的倍数，而直接写成bi.biWidth*4，原因很简单，32位位图每像素占 //4位，所以一行占用的字节数无论如何都将是4的倍数。
+
+ bf.bfSize=bf.bfOffBits+SImageSize;
+
+ Output.Write(&bf,sizeof(bf)); //给输出文件写头信息
+
+ bi.biSizeImage=SImageSize; bi.biBitCount=32;
+
+ Output.Write(&bi,sizeof(bi)); //给输出文件写头信息
+
+ bi.biSizeImage=FImageSize; //恢复以前的bi数据值 bi.biBitCount=24; //恢复以前的bi数据值
+
+ /////////////////////////////////////// char* Sbuff=new char[SrowByte]; //用于保存源位图一行的信息 char* Dbuff=new char[bi.biWidth*4]; //用于保存目的位图一行的信息
+
+ for(int j=0;j<bi.biHeight;j++) {  file.Read(Sbuff,SrowByte);  for(int i=0;i<bi.biWidth;i++)  {   for(int k=0,n=0;k<3;k++) //i每循环一次，处理一个象素点，一象素占3字节。    if((char)255==(Dbuff[4*i+k]=Sbuff[3*i+k])) //拷贝图像信息，并记录达到最大值的通道数     n++; //达最大值255的通道数加1   if(3==n) //如果红、绿、蓝通道均达到最大，说明该点为透明    Dbuff[4*i+3]=Dbuff[4*i+2]=Dbuff[4*i+1]=Dbuff[4*i]=(char)0;    //把该点的红、绿、蓝、alpha通道赋0，表示完全透明   else //该点不透明，把alpha赋255，表示完全不透明    Dbuff[4*i+3]=(char)255;  }  Output.Write(Dbuff,bi.biWidth*4); //将转换后的数据输出到文件中。 }
+
+ delete[] Sbuff; delete[] Dbuff; file.Close(); Output.Close(); ///////////////////////////////////////
+
+ AfxMessageBox("转换完成！");
+
+用这个函数做成的32位位图，AlphaBlend函数完全理解，运行正常！

@@ -1,0 +1,10 @@
+Truncate   Table后，索引占的空间会被自动释放掉吗？   
+  是不是必须用alter   index   index_name   rebuild才能收回空间呢？   
+  这样做的效率如何呢？ 
+
+Truncate   Table后，会自动释放表及其索引占的空间
+
+delete以后index也会自动更新，但是不释放空间（和table的情况一样）。   
+  alter   index   index_name   rebuild其实是先drop   index然后再重建，所以能回收空间。   
+    
+  所以trancate效率最高，如果一定要用delete，那建议先drop或者disable   index，delete   records以后再rebuild，那样效率也比直接从表中delete效率高。

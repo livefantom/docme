@@ -1,0 +1,10 @@
+【类相关】
+
+
+array get_class_vars( string class_name )
+返回由类的默认属性组成的关联数组，此数组的元素以varname => value的形式存在。
+eg:	get_class_vars( get_class($this) );
+
+string get_class(object obj)
+返回对象实例obj所属类的名字。如果obj不是一个对象则返回FALSE。
+eg:	见上例。

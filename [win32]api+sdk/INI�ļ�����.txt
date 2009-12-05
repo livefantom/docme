@@ -1,0 +1,334 @@
+[INI文件操作]
+
+有以下几个相关方法：
+GetPrivateProfileInt
+GetPrivateProfileSection
+GetPrivateProfileSectionNames
+GetPrivateProfileString
+GetPrivateProfileStruct
+
+================================================================================
+  
+  
+  用Visual   C++操作INI文件   
+    
+  --------------------------------------------------------------------------------   
+    
+  发布者:soarlove     类别:系统编程     日期:2002.08.21   09:58:22     今日/总浏览:   1/112   
+    
+  简要说明:     
+  　　   
+    
+  在我们写的程序当中,总有一些配置信息需要保存下来,以便完成程序的功能,最简单的办法就是将这些信息写入INI文件中,程序初始化时再读入.具体应用如下:   
+    
+  　　一.将信息写入.INI文件中.   
+    
+  　　1.所用的WINAPI函数原型为:     
+    
+  BOOL   WritePrivateProfileString(   
+  LPCTSTR   lpAppName,   
+  LPCTSTR   lpKeyName,   
+  LPCTSTR   lpString,   
+  LPCTSTR   lpFileName   
+  );     
+    
+  　　其中各参数的意义:   
+    
+  　　　LPCTSTR   lpAppName   是INI文件中的一个字段名.   
+    
+  　　　LPCTSTR   lpKeyName   是lpAppName下的一个键名,通俗讲就是变量名.   
+    
+  　　　LPCTSTR   lpString   是键值,也就是变量的值,不过必须为LPCTSTR型或CString型的.   
+    
+  　　　LPCTSTR   lpFileName   是完整的INI文件名.   
+    
+  　　2.具体使用方法:设现有一名学生,需把他的姓名和年龄写入   c:\stud\student.ini   文件中.     
+    
+  CString   strName,strTemp;   
+  int   nAge;   
+  strName="张三";   
+  nAge=12;   
+  ::WritePrivateProfileString("StudentInfo","Name",strName,"c:\\stud\\student.ini");     
+    
+  　　此时c:\stud\student.ini文件中的内容如下:   
+    
+  　　　[StudentInfo]   
+  　　　Name=张三   
+    
+  　　3.要将学生的年龄保存下来,只需将整型的值变为字符型即可:   
+    
+  strTemp.Format("%d",nAge);   
+  ::WritePrivateProfileString("StudentInfo","Age",strTemp,"c:\\stud\\student.ini");     
+  　二.将信息从INI文件中读入程序中的变量.   
+    
+  　　1.所用的WINAPI函数原型为:   
+    
+  DWORD   GetPrivateProfileString(   
+  LPCTSTR   lpAppName,     
+  LPCTSTR   lpKeyName,     
+  LPCTSTR   lpDefault,     
+  LPTSTR   lpReturnedString,     
+  DWORD   nSize,     
+  LPCTSTR   lpFileName     
+  );     
+    
+  　　其中各参数的意义:     
+    
+  　　　前二个参数与   WritePrivateProfileString中的意义一样.   
+    
+  　　　lpDefault   :   如果INI文件中没有前两个参数指定的字段名或键名,则将此值赋给变量.     
+    
+  　　　lpReturnedString   :   接收INI文件中的值的CString对象,即目的缓存器.   
+    
+  　　　nSize   :   目的缓存器的大小.   
+    
+  　　　lpFileName   :   是完整的INI文件名.   
+    
+  　　2.具体使用方法:现要将上一步中写入的学生的信息读入程序中.   
+    
+  CString   strStudName;   
+  int   nStudAge;     
+  GetPrivateProfileString("StudentInfo","Name","默认姓名",strStudName.GetBuffer(MAX_PATH),MAX_PATH,"c:\\stud\\student.ini");     
+    
+  　　执行后   strStudName   的值为:"张三",若前两个参数有误,其值为:"默认姓名".   
+    
+  　　3.读入整型值要用另一个WINAPI函数:     
+    
+  UINT   GetPrivateProfileInt(   
+  LPCTSTR   lpAppName,     
+  LPCTSTR   lpKeyName,     
+  INT   nDefault,     
+  LPCTSTR   lpFileName     
+  );     
+    
+  　　这里的参数意义与上相同.使用方法如下:   
+    
+  nStudAge=GetPrivateProfileInt("StudentInfo","Age",10,"c:\\stud\\student.ini");     
+  三.循环写入多个值,设现有一程序,要将最近使用的几个文件名保存下来,具体程序如下:   
+    
+  　　1.写入:   
+    
+  CString   strTemp,strTempA;   
+  int   i;   
+  int   nCount=6;   
+  file://共有6个文件名需要保存   
+  for(i=0;i   {strTemp.Format("%d",i);   
+  strTempA=文件名;   
+  file://文件名可以从数组,列表框等处取得.   
+  ::WritePrivateProfileString("UseFileName","FileName"+strTemp,strTempA,   
+  "c:\\usefile\\usefile.ini");   
+  }   
+  strTemp.Format("%d",nCount);   
+  ::WritePrivateProfileString("FileCount","Count",strTemp,"c:\\usefile\\usefile.ini");   
+  file://将文件总数写入,以便读出.     
+    
+  　　2.读出:   
+    
+  nCount=::GetPrivateProfileInt("FileCount","Count",0,"c:\\usefile\\usefile.ini");   
+  for(i=0;i   {strTemp.Format("%d",i);   
+  strTemp="FileName"+strTemp;   
+  ::GetPrivateProfileString("CurrentIni",strTemp,"default.fil",   strTempA.GetBuffer(MAX_PATH),MAX_PATH,"c:\\usefile\\usefile.ini");   
+    
+  file://使用strTempA中的内容.   
+    
+  }     
+    
+  　　补充四点:   
+    
+  　　　1.INI文件的路径必须完整,文件名前面的各级目录必须存在,否则写入不成功,该函数返回   FALSE   值.   
+    
+  　　　2.文件名的路径中必须为   \\   ,因为在VC++中,   \\   才表示一个   \   .   
+    
+  　　　3.也可将INI文件放在程序所在目录,此时   lpFileName   参数为:   ".\\student.ini".   
+    
+  　　　4.从网页中粘贴源代码时,最好先粘贴至记事本中,再往VC中粘贴,否则易造成编译错误,开始时我也十分不解,好好的代码怎么就不对呢?后来才找到这个方法.还有一些代码中使用了全角字符如:＜，＼等,也会造成编译错误.   
+
+
+
+
+
+--------------------------------------------------------------------------------------------------------------
+char   szFilePath[256];   
+  char   szTemp[256];   
+    
+  strcat   (szFilePath,   "c:\\config.ini")   ;   
+    
+  GetPrivateProfileString("qqq","SERVER","http:",szTemp,20,szFilePath);   
+  Server=szTemp;   
+    
+  GetPrivateProfileString("qqq","SERVERANDNAME","http://85/",szTemp,40,szFilePath);   
+  ServerandName=szTemp;
+Top
+
+2 楼kingcom_xu（冷羽）回复于 2002-11-27 10:31:24 得分 10CWinApp类本身就封装了读注册表以及ini文件的读取和写入的功能...   
+    
+  默认情况下InitInstance()函数中有   
+  SetRegistryKey(_T("Your   Application   Name"));   
+  这样你调用AfxGetApp()->GetProfileString(...)时获得的是保存在注册表里的...同样AfxGetApp()->WriteProfileInt(...);也是往注册表里写...   
+  如果你想改用ini文件来保存的话只需把SetRegistryKey那一行注释掉然后加上m_pszProfileName=_tcsdup(_T("your   ini   filepath"));就行了...   
+
+
+
+
+-------------------------------------------------------------------------------------------------------------------
+首先默认的是当前目录，然后是系统目录、Windows目录   
+  差异在于少了指定文件，指定文件在CWinApp::m_pszProfileName中定义。并且少了指定长度。   
+    
+  1。CWinApp::GetProfileString     
+  GetProfileString(   LPCTSTR   lpszSection,   LPCTSTR   lpszEntry,   LPCTSTR   lpszDefault   =   NULL   );   
+  2。DWORD   GetProfileString(   
+      LPCTSTR   lpAppName,                 //   address   of   section   name   
+      LPCTSTR   lpKeyName,                 //   address   of   key   name   
+      LPCTSTR   lpDefault,                 //   address   of   default   string   
+      LPTSTR   lpReturnedString,     //   address   of   destination   buffer   
+      DWORD   nSize                               //   size   of   destination   buffer   
+  );   
+
+
+--------------------------------------------------------------------------------------------------------------------------
+
+读取INI配置文件GetProfileString和GetPrivateProfileString参数说明和示例/
+/读取win.ini配置文件
+DWORD GetProfileString(
+  LPCTSTR lpAppName,        // section name
+  LPCTSTR lpKeyName,        // key name
+  LPCTSTR lpDefault,        // default string
+  LPTSTR lpReturnedString,  // destination buffer
+  DWORD nSize,              // size of destination buffer
+);
+
+//读取INI配置文件
+DWORD GetPrivateProfileString(
+  LPCTSTR lpAppName,        // section name
+  LPCTSTR lpKeyName,        // key name
+  LPCTSTR lpDefault,        // default string
+  LPTSTR lpReturnedString,  // destination buffer
+  DWORD nSize,              // size of destination buffer
+  LPCTSTR lpFileName        // initialization file name
+);
+示例:
+ CFileDialog myFileDialog(true,
+ "ini",
+ "NS900",
+ OFN_HIDEREADONLY|OFN_OVERWRITEPROMPT |
+ OFN_ALLOWMULTISELECT|OFN_EXPLORER, 
+ "配置文件(*.ini)|*.ini||",
+ NULL); 
+ 
+ if(myFileDialog.DoModal() == IDOK)
+ {
+  CString strPath = myFileDialog.GetPathName();
+  //打开文件显示
+  CString str;
+  int nSize = 254;
+  GetPrivateProfileString("NS900","身份码",NULL,str.GetBuffer(254),nSize,strPath);
+ }
+
+
+--------------------------------------------------------------------------------------------------------------------------
+GetPrivateProfileString
+函数作用:得到INI文件的配置信息 
+
+定义：
+DWORD GetPrivateProfileString(
+  LPCTSTR lpAppName,  //Section Name
+  LPCTSTR lpKeyName,  //Key Name
+  LPCTSTR lpDefault,       //Return Default Value
+  LPTSTR lpReturnedString, //Point to Return String
+  DWORD nSize,                     //Return String size
+  LPCTSTR lpFileName        //INI文件的地址,注意,这个地址要绝对地址.
+);
+要得到当前执行程序目录下的INI文件的地址,可调用:GetModuleFileName函数和GetCurrentDirectory
+
+1、GetModuleFileName
+函数作用:返回当前进行包含的指定模块所在文件的绝对路径
+
+定义：
+DWORD GetModuleFileName(
+  HMODULE hModule,    //模块名,NULL表示返回当前进程所在的可执行文件的绝对路径
+  LPTSTR lpFilename,   //返回的文件的绝对路径
+  DWORD nSize              //返回的路径size
+);
+
+2、GetCurrentDirectory
+函数作用:返回当前进程的当前目录
+
+ 定义：
+DWORD GetCurrentDirectory(
+  DWORD nBufferLength,   
+  LPTSTR lpBuffer
+);
+
+
+可类似如下进行INI文件的读取:
+const CString INI_INFO_SECTION_STUDY_INFO = _T("StudyInfo");
+const CString INI_INFO_STUDY_KEY_STUDY_ID = _T("StudyID");
+
+BOOL CINIClass::GetFileFullPath(CString szFileName)
+{
+ char szModuleFileDirec[MAX_PATH] = "";
+ DWORD dwLength = GetModuleFileName(NULL,szModuleFileDirec,MAX_PATH); 
+ if(dwLength == 0) 
+ {  
+  szModuleFileDirec[0] = '\0';  
+ } 
+ CString szTempUse = szModuleFileDirec; 
+ szTempUse = szTempUse.Left(szTempUse.ReverseFind('\\')+1); 
+ szTempUse += szFileName;
+ m_szFileDirect = szTempUse;
+ 
+ CFileFind finder; 
+
+ BOOL bWorking = finder.FindFile(m_szFileDirect); 
+ if(!bWorking)
+ {  
+  AfxMessageBox(_T("没有找到文件"));
+  return FALSE;
+ }
+  return TRUE;
+}
+
+BOOL CINIClass::LoadINI()
+{
+   char szTemp[MAX_PATH] = _T("");
+   GetPrivateProfileString(INI_INFO_SECTION_STUDY_INFO,
+       INI_INFO_STUDY_KEY_STUDY_ID,
+       _T("0"), 
+       szTemp,
+       MAX_PATH,
+       m_szBasicInfoFile);
+ m_szPatID = szTemp;
+}
+//IN文件的样式如下:
+[StudyInfo]
+StudyID=
+
+
+-----------------------------------------------------------------------------------------------------------------
+BOOL CMyApp::InitInstance()
+{
+    // CMyApp is derived from CWinApp.
+
+    const char *pszKey = "MyApp";
+    const char *pszName = "Julian";
+    int iAge = 26;
+
+    // Change the registry key under which our settings are stored.
+
+    SetRegistryKey(_T(""));
+
+    // Write the information to the registry.
+
+    WriteProfileString(pszKey, "Name", pszName);
+    WriteProfileInt(pszKey, "Age", iAge);
+
+    // Read the information from the registry.
+
+    CString strName = GetProfileString(pszKey, "Name");
+    int iAge2 = GetProfileInt(pszKey, "Age", 0);
+
+    ASSERT(strName == pszName);
+    ASSERT(iAge2 == iAge);
+
+    return TRUE;
+}

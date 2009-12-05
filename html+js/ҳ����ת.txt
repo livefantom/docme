@@ -1,0 +1,23 @@
+<script language=javascript>
+parent.main.location.href="master.php?n_c_num=<?=$n_c_num?>";
+</script> 
+
+
+<?php
+function page_redirect($redirect_to){
+    if (headers_sent()){ // Use JavaScript to redirect if content has been previously sent (not recommended, but safe)
+        echo ‘<script language=”JavaScript” type=”text/javascript”>window.location=\”;
+        echo $redirect_to;
+        echo ‘\’;</script>’;
+    }else{    // Default Header Redirect
+        header(‘Location: ’ . $redirect_to);
+    }
+}
+?>
+
+
+5秒之后刷新本页面:
+<meta http-equiv="refresh" content="5" />
+
+5秒之后转到梦之都首页:
+<meta http-equiv="refresh" content="5; url=http://www.dreamdu.com/" />

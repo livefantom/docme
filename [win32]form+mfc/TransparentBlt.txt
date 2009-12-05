@@ -1,0 +1,82 @@
+// TransparentBlt	- Copies a bitmap transparently onto the destination DC
+// hdcDest		- Handle to destination device context 
+// nXDest		- x-coordinate of destination rectangle's upper-left corner 
+// nYDest		- y-coordinate of destination rectangle's upper-left corner 
+// nWidth		- Width of destination rectangle 
+// nHeight		- height of destination rectangle 
+// hBitmap		- Handle of the source bitmap
+// nXSrc		- x-coordinate of source rectangle's upper-left corner 
+// nYSrc		- y-coordinate of source rectangle's upper-left corner 
+// colorTransparent	- The transparent color
+// hPal			- Logical palette to be used with bitmap. Can be NULL
+
+void TransparentBlt( HDC hdcDest, int nXDest, int nYDest, int nWidth,
+			int nHeight, HBITMAP hBitmap, int nXSrc, int nYSrc,
+			COLORREF colorTransparent, HPALETTE hPal )
+{
+	CDC dc, memDC, maskDC, tempDC;
+	dc.Attach( hdcDest );
+	maskDC.CreateCompatibleDC(&dc);
+	CBitmap maskBitmap;
+
+	//add these to store return of SelectObject() calls
+	CBitmap* pOldMemBmp = NULL;
+	CBitmap* pOldMaskBmp = NULL;
+	HBITMAP hOldTempBmp = NULL;
+
+	memDC.CreateCompatibleDC(&dc);
+	tempDC.CreateCompatibleDC(&dc);
+	CBitmap bmpImage;
+	bmpImage.CreateCompatibleBitmap( &dc, nWidth, nHeight );
+	pOldMemBmp = memDC.SelectObject( &bmpImage );
+
+	// Select and realize the palette
+	if( dc.GetDeviceCaps(RASTERCAPS) & RC_PALETTE && hPal )
+	{
+		::SelectPalette( dc, hPal, FALSE );
+		dc.RealizePalette();
+
+		::SelectPalette( memDC, hPal, FALSE );
+	}
+
+	hOldTempBmp = (HBITMAP) ::SelectObject( tempDC.m_hDC, hBitmap );
+
+	memDC.BitBlt( 0,0,nWidth, nHeight, &tempDC, nXSrc, nYSrc, SRCCOPY );
+
+	// Create monochrome bitmap for the mask
+	maskBitmap.CreateBitmap( nWidth, nHeight, 1, 1, NULL );
+	pOldMaskBmp = maskDC.SelectObject( &maskBitmap );
+	memDC.SetBkColor( colorTransparent );
+
+	// Create the mask from the memory DC
+	maskDC.BitBlt( 0, 0, nWidth, nHeight, &memDC,
+		0, 0, SRCCOPY );
+
+	// Set the background in memDC to black. Using SRCPAINT with black 
+	// and any other color results in the other color, thus making 
+	// black the transparent color
+	memDC.SetBkColor(RGB(0,0,0));
+	memDC.SetTextColor(RGB(255,255,255));
+	memDC.BitBlt(0, 0, nWidth, nHeight, &maskDC, 0, 0, SRCAND);
+
+	// Set the foreground to black. See comment above.
+	dc.SetBkColor(RGB(255,255,255));
+	dc.SetTextColor(RGB(0,0,0));
+	dc.BitBlt(nXDest, nYDest, nWidth, nHeight, &maskDC, 0, 0, SRCAND);
+
+	// Combine the foreground with the background
+	dc.BitBlt(nXDest, nYDest, nWidth, nHeight, &memDC,
+		0, 0, SRCPAINT);
+
+
+	if (hOldTempBmp)
+		::SelectObject( tempDC.m_hDC, hOldTempBmp);
+	if (pOldMaskBmp)
+		maskDC.SelectObject( pOldMaskBmp );
+	if (pOldMemBmp)
+		memDC.SelectObject( pOldMemBmp );
+
+	dc.Detach();
+}
+
+

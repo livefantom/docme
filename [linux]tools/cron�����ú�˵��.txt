@@ -1,0 +1,388 @@
+计划任务工具 cron 的配置和说明
+作者：北南南北
+来自：LinuxSir.Org
+摘要：Linux操作系统中，计划任务通常由cron来承担，了解或掌握cron，能为我们管理服务器带来更多的便利，也能省却更多的时间。本文也举了一些简单明了的例子，为了让新手上路方便；
+
+目录
+
+1、计划任务概说；
+2、cron；
+
+2.1 cron 的安装和启动；
+
+2.1.1 在Redhat 或 Fedora等RPM包管理的系统的安装；
+2.1.2 在Slackware系统中的安装；
+2.1.3 cron 的开启、停止、重新启动方法； 
+2.2 cron 配置文件；
+
+2.2.1 全局性配置文件；
+2.2.2 cron 配置计划任务的书写格式 
+2.2.3 关于同一时间，同时执行多个任务的定义方法；
+2.2.4 对于用户自身的cron 配置文件的说明； 
+3、计划任务的应用范围；
+4、关于本文；
+5、后记；
+6、参考文档；
+7、相关文档； 
+
+
+++++++++++++++++++++++++++++++++++++++
+正文
+++++++++++++++++++++++++++++++++++++++
+
+
+
+1、计划任务概说；
+
+
+计划任务，是任务在约定的时间执行已经计划好的工作，这是表面的意思。在Linux中，我们经常用到 crond 服务器来完成这项工作。cron服务器可以根据配置文件约定的时间来执行特定的作务。比如我们可以在配置文件中约定每天早上4点，对httpd 服务器重新启动，这就是一个计划任务；
+
+下面我们先来说说cron；
+
+
+2、cron；
+
+
+在Linux系统中，计划任务一般是由cron承担，我们可以把cron设置为开机时自动启动。cron启动后，它会读取它的所有配置文件（全局性配置文件/etc/crontab，以及每个用户的计划任务配置文件），然后cron会根据命令和执行时间来按时来调用度工作任务。
+
+
+2.1 cron 的安装和启动；
+
+
+在一般情况下，cron都是系统默认安装的，我们要学会查看软件包是否已经安装；
+
+
+2.1.1 在Redhat 或 Fedora等RPM包管理的系统的安装；
+
+
+判断系统是否已经安装cron相关的包 
+
+Fedora 5.0 系统的情况；
+
+其它版本的Fedora及Redhat的系统和这相似；
+
+
+[root@localhost ~]# rpm -qa |grep cron
+vixie-cron-4.1-54.FC5
+anacron-2.3-36.1
+crontabs-1.10-7.1
+
+其中vixie-cron软件包是cron的主程序，您可以通过下面的命令来了解它，其它软件包同理；
+
+
+[root@localhost beinan]# rpm -ql vixie-cron
+
+crontabs 软件包是用来安装、卸装、或列举用来驱动 cron 守护进程的表格的程序。cron 守护进程检查 crontab 文件来查看某个指定命令被调度执行的时间。如果命令已经调度，守护进程就会执行它们。了解crontabs软件包都安装了些什么，应该用下面的命令；
+
+
+[root@localhost beinan]# rpm -ql  crontabs 
+
+如果没有安装，可以从光盘中找出文件名带有cron字样的软件包来安装。
+
+
+[root@localhost ~]# rpm -ivh vixie-cron-4.1-54.FC5*
+[root@localhost ~]# rpm -ivh crontabs*
+
+也可以用yum 来在线安装；
+
+
+[root@localhost ~]# yum install vixie-cron
+[root@localhost ~]# yum install crontabs
+
+
+2.1.2 在Slackware系统中的安装；
+
+
+在Slackware中cron软件包是 dcron，您可以在光盘中找出来安装它；
+
+查看是否已经安装了dcron软件包，您可以这样查看。在这里能列出软件包详细的安装情况；
+
+
+[root@localhost ~]# more /var/adm/packages/dcron*
+
+如果没有安装，请用下面的命令来安装。在第一张安装盘中找出dcron软件包；
+
+
+[root@localhost ~]# installpkg dcron*.tgz 
+
+
+2.1.3 cron 的开启、停止、重新启动方法；
+
+
+cron配置文件被修改后，想让新文件生效，必须重新crond服务器，有两种方法可供选择；
+
+
+第一种 在Fedora或Redhat 等以RPM包管理的系统中；
+
+
+
+[root@localhost ~]# /etc/init.d/crond start 
+[root@localhost ~]# /etc/init.d/crond stop 
+[root@localhost ~]# /etc/init.d/crond restart
+
+如果想在Fedora 和 Redhat 或以这些发行版为基础克隆的发行版，如果想自动开机运行，请用下面的办法；
+
+
+[root@localhost ~]# chkconfig --levels 35 crond on
+
+第二种：通用
+
+
+[root@localhost ~]# pgrep crond  注：判断crond 是否在运行；
+[root@localhost ~]# pkill crond  注：杀掉正在运行中的crond；
+[root@localhost ~]# pgrep crond  注：查看是否被杀掉了；
+[root@localhost ~]# /usr/sbin/crond  注：运行crond；
+
+
+2.2 cron 配置文件；
+
+
+cron 是一个服务器程序，我们都知道Linux的服务器的配置，大多是通过配置文件来完成的，cron自然也不例外，在Redhat/Fedora 等系统中它的全局性配置文件是/etc/crontab；在Slackware系统中，全局性文件是/var/spool/cron/crontabs/root 。每个用户也有自己的cron配置文件，我们可以通过crontab -e 来编辑它；
+
+
+2.2.1 全局性配置文件；
+
+
+下面是一个全局性的配置文件例子，以Fedora Core 5为例；
+
+
+[root@localhost ~]# more /etc/crontab
+SHELL=/bin/bash
+PATH=/sbin:/bin:/usr/sbin:/usr/bin
+MAILTO=root
+HOME=/
+# run-parts
+1 * * * * root run-parts /etc/cron.hourly
+#
+2 4 * * * root run-parts /etc/cron.daily
+#
+22 4 * * 7 root run-parts /etc/cron.weekly
+#
+42 4 1 * * root run-parts /etc/cron.monthly
+#
+0,5,10,15,20,25,30,35,40,45,50,55 * * * * root /usr/bin/mrtg /etc/mrtg/mrtg.cfg
+
+对于全局性配置文件，我们要用root权限来更改，一般是通过crontab -e 来修改。但有时也并不一定是这样的，比如Fedora Core 5 如果通过crontab -e 修改的是root用户的cron 配置文件。所以我们要在Fedora Core 5中修改全局性配置文件可以用vi 编辑器来修改。vi的用法请参考：《文件编辑器 vi》
+
+在全局性配置文件中，定义了可执行命令的路径环境变量，所用SHELL类型的定义等，这些大多不用修改；我们经常添加的是计划任务或修改任务执行的时间等；
+
+在全局性配置文件中，我们发现有类似这些行；
+
+
+1 * * * * root run-parts /etc/cron.hourly  注：表示每个小时的第一分钟，开始执行/etc/hourly目录下的可执行程序或脚本；
+2 4 * * * root run-parts /etc/cron.daily  注：表示每天的4点2分，开始执行/etc/cron.daily目录下的可执行程序或脚本；
+22 4 * * 7 root run-parts /etc/cron.weekly 注：每年第7个周4点我22分，开始执行 /etc/cron.weekly目录下的可执行程序或脚本；
+42 4 1 * * root run-parts /etc/cron.monthly 注：每月第1天的4点42分，开始执行/etc/cron.monthly目录下的可执行程序或脚本；
+
+这些行是用来在同一时间批量执行任务的，我们在以后的例子中独立出来解说，在这里只是让大家心中有数；
+
+
+2.2.2 cron 配置计划任务的书写格式
+
+
+
+分钟 小时 日  月  周   ［用户名］  命令
+
+说明：
+
+第一段应该定义的是：分钟，表示每个小时的第几分钟来执行。范围是从0-59
+第二段应该定义的是：小时，表示从第几个小时来执行，范围是从0-23
+第三段应该定义的是：日期，表示从每个月的第几天执行，范围从1-31
+第四段应该定义的是：月，表示每年的第几个月来执行，范围从1-12
+第五段应该定义的是：周，表示每周的第几天执行，范围从0-6，其中 0表示星期日。
+每六段应该定义的是：用户名，也就是执行程序要通过哪个用户来执行，这个一般可以省略；
+第七段应该定义的是：执行的命令和参数。
+注：其中用户名可是省略，用户名定义的是程序用哪个用户来执行，比如mysql服务器，我们可以定义成以mysql用户来启动、停止、重新启动，这时要写上用户名；不过对于cron来说意义不是太大，因为每个用户都有自己的cron配置文件。有些程序的启动必须用到root用户，这时我们就可以修改root用户的cron配置文件就行了。在每个用户的配置文件中，不必指定用户名。
+
+我们可以把计划任务写在全局性配置文件中，如果您想把一个计划放入全局性配置文件中，就得改发行版所对应的cron全局配置文件，比如Fedora 5的全局性配置文件是/etc/crontab文件；
+
+每个用户也能定义自己的cron配置文件，用crontab -e 命令来定义；
+
+举一例：让机器在每天8点30分重新启动；
+
+关于时间格式中有7个字段。我们可以直接更改或者添加，当然这是系统任务调用。举个例子，比如我在每天的早上8点30分重新启动机器，就可以在
+/etc/crontab中加入下面的两句，第一句就是注释了。以#号开始，后面写一个自己能知道这是什么任务的备注；
+
+
+# reboot OS
+30 8 * * *  root /sbin/reboot 
+
+第一段应该定义的是：分钟，表示每个小时的第几分钟来执行。范围是从0-59
+第二段应该定义的是：小时，表示从第几个小时来执行，范围是从0-23
+第三段应该定义的是：日期，表示从每个月的第几天执行，范围从1-31
+第四段应该定义的是：月，表示每年的第几个月来执行，范围从1-12
+第五段应该定义的是：周，表示每周的第几天执行，范围从0-6，其中 0表示星期日。
+每六段应该定义的是：用户名，也就是执行程序要通过哪个用户来执行，这个一般可以省略；
+第七段应该定义的是：执行的命令和参数。
+
+对比上面的例子就知道，30是不是分钟？？8是不是小时？如果有*代表的地方，表示全部，也就是说，每个月，每天，每星期都要执行。root 表示用root用户执行，命令是/sbin/reboot ，也就是说，系统在每天 8点30分重新启动；
+
+我们可以把每天8点30分重新启动的计划任务写入cron全局性配置文件中，也可以定义在root用户自己的cron配置文件中。如果定义在root自己的配置文件，请用root身份来执行 crontab -e 来修改配置文件；crontab -e 进入修改配置文件的过程，其实和vi的用法一样，请参看vi 的用法：《文件编辑器 vi》
+
+让配置文件生效：如果让配置文件生效，还得重新启动cron，切记，既然每个用户下的cron配置文件修改后。也要重新启动cron服务器。
+
+在Fedora 和Redhat中，我们应该用；
+
+
+[root@localhost ~]# /etc/init.d/crond restart
+
+如果让crond 在开机时运行，应该改变其运行级别；
+
+
+[root@localhost ~]# chkconfig --levels 35 crond on
+
+在Slackware中，如果开机自动运行；
+
+查看/etc/rc.d/rc.M文件是否有如的行，如果没有就加上，大多是有的；
+
+
+# Start crond (Dillon's crond):
+if [ -x /usr/sbin/crond ]; then
+  /usr/sbin/crond -l10 >>/var/log/cron 2>&1
+</cdoe>
+
+<b>
+如果想让立即让cron重启生效，也可以用下面的办法；
+</b>
+
+<code>
+[root@localhost ~]# pgrep crond  注：查看crond服务器是否运行；
+2022
+[root@localhost ~]# pkill crond 注：杀死crond；
+[root@localhost ~]# pgrep crond 注：查看crond是否退出；
+[root@localhost ~]# /usr/sbin/crond  注：启动crond；
+[root@localhost ~]# pgrep crond  注：查看crond 是否已经运行得起来了；
+3883
+
+
+2.2.3 关于同一时间，同时执行多个任务的定义方法；
+
+
+我们在前面已经说过，在全局性配置文件中，有类似如下的段落；
+
+
+1 * * * * root run-parts /etc/cron.hourly  注：表示每个小时的第一分钟，开始执行/etc/hourly目录下的可执行程序或脚本；
+2 4 * * * root run-parts /etc/cron.daily  注：表示每天的4点2分，开始执行/etc/cron.daily目录下的可执行程序或脚本；
+22 4 * * 7 root run-parts /etc/cron.weekly 注：每年第7个周4点我22分，开始执行 /etc/cron.weekly目录下的可执行程序或脚本；
+42 4 1 * * root run-parts /etc/cron.monthly 注：每月第1天的4点42分，开始执行/etc/cron.monthly目录下的可执行程序或脚本；
+
+举例来说，我想在每天5点10分来重新启动httpd 服务器，与此同时，我们也可以同时下载一个ISO文件。如果我们按书写计划任务的规则一条一条的来书写，并添加到全局是有点麻烦。不如写一个脚本放在/etc/crond.daily目录中。然后把其权限设置为755 （关于权限的设置，请参考：《Linux 文件和目录的属性》）。
+
+当然我们得改一改上面的 带有/etc/cron.daily那行，改为如下；
+
+
+10 5 * * * root run-parts /etc/cron.daily
+</cdoe>
+
+然后我们到/etc/crond.daily目录中创建两个文件，一个是用来重启httpd服务器的，如下；
+
+<code>
+[root@localhost cron.daily]# touch httpd.sh
+[root@localhost cron.daily]# chmod 755 httpd.sh
+[root@localhost cron.daily]# echo "/etc/init.d/httpd restart" > httpd.sh
+[root@localhost cron.daily]# more httpd.sh
+/etc/init.d/httpd restart
+
+如果我想在每天5点20分下载FC5的镜像，可以再创建一个文件fc5down.sh
+
+
+[root@localhost cron.daily]# touch fc5down.sh
+[root@localhost cron.daily]# chmod 755 fc5down.sh
+[root@localhost cron.daily]# echo "/usr/bin/wget  http://mirrors.kernel.org/fedora/core/5/i386/iso/FC-5-i386-DVD.iso" > fc5down.sh
+[root@localhost cron.daily]# more fc5down.sh
+/usr/bin/wget  http://mirrors.kernel.org/fedora/core/5/i386/iso/FC-5-i386-DVD.iso
+
+然后我们重新启动一下crond就行了；
+
+
+[root@localhost cron.daily]# pkill crond 
+[root@localhost cron.daily]# prep crond
+[root@localhost cron.daily]# crond&
+
+注意：我只是想说明一下，在同一时间 执行多个计划任务的简单用法，并不是有意教给您每天早上都下载FC5的映像。我举这个例子是为了初学者了解这个功能。如果您有好多的任务在某一时刻执行，那就自己写脚本文件。放在/etc目录下的cron.hourly 、cron.daily 、cron.weekly 、cron.monthly 目录中。凡是放进这些目录的可执行脚本，都能在约定的时间内准确执行。每个目录有每个目录的用途；
+
+
+2.2.4 对于用户自身的cron 配置文件的说明；
+
+
+每个用户都有自己的cron配置文件，通过crontab -e 就可以编辑，一般的情况下，在Fedora和Redhat的发行版，我们编辑好用户的cron配置文件保存退出后，系统会自动就存放于/var/spool/cron/目录中，文件以用户名命名。在Slackware中是位于/var/spool/cron/crontabs/目录中。其它的发行版都差不多，有点类似。自己找找吧；查看用户的计划任务是crontab -l 
+
+
+crontab -e  注：编辑用户的cron配置文件；
+crontab -l  注：查看用户的计划任务；
+
+比如我用beinan用户来运行crontab -e ；
+
+
+[beinan@localhost ~]$ id 注：判断所用用户身份；
+uid=500(beinan) gid=500(beinan) groups=500(beinan)
+
+[beinan@localhost ~]$ crontab -e 注：编辑用户beinan的计划任务；
+
+我们在里面定义一个任务；
+
+
+40 20 * * *  /usr/bin/wget  http://mirrors.kernel.org/fedora/core/5/i386/iso/FC-5-i386-DVD.iso
+
+保存退出后，我们用下面的命令来查看beinan用户的计划任务；
+
+
+[beinan@localhost ~]$ crontab -l
+
+40 20 * * *  /usr/bin/wget  http://mirrors.kernel.org/fedora/core/5/i386/iso/FC-5-i386-DVD.iso
+
+配置好后，我们还要重新启动crond服务器，每个用户cron配置文件的改动都得重新启动crond服务器；前面已经说过了，这里省略；值得注意的是重启crond服务器，需要root权限，您可以用su命令切换到root 用户，然后再来重启crond；
+
+
+在Fedora或Redhat等以RPM包管理的发行版中；
+
+
+
+[beinan@localhost ~]$ su
+口令：
+[root@localhost beinan]# /etc/init.d/crond restart
+停止 crond：                                               [确定]
+启动 crond：                                               [确定]
+
+
+也可以先杀死crond，再运行crond命令的办法来启动；
+
+
+
+[root@localhost beinan]# pkill crond
+[root@localhost beinan]# pgrep crond
+[root@localhost beinan]# /usr/sbin/crond
+[root@localhost beinan]# pgrep crond
+6664
+
+
+3、计划任务的应用范围；
+
+
+计划任务主要是让系统自动完成一些工作。比如我们可以让系统自动在某一时刻清理或备份httpd服务器的日志，然后重新启动httpd服务器，这对网络管理员来说是很重要的。也可以让系统自动清空位于/tmp目录的垃圾文件。
+
+另外值得一提的是，LinuxSir.Org 有很多子站，每个子站都有RSS，能让这些站点的RSS相互投递，也是用cron来完成，比如是在早上4点左右开始执行这个任务。这是一个极为耗费资源的过程，如果不是放在在线人少的时候，基本无法完成，所以只能放在早上进行。作为SIR的管理员，不可能每天早上4点起来点鼠标来完成这些事吧。所以最好的办法就是通过cron来自动运行，以在服务器最清闲的时候来完成这项工作；
+
+
+4、关于本文；
+
+
+本文是关于计划任务的，本来想把有关计划任务的内容都写在一个文档中，由于在写文档之前没有准备好，所以只写了一个cron ；本文可能会在近期调整一下，加入at等工具的用法等；
+
+
+5、后记；
+
+
+这篇后记不用写了，我在本文档修改期间写了进程管理的文档；
+
+有一件趣事得提一提，昨天查看lumaqq.inuxsir.org 的 google 广告收入，目前大约是70＄左右，这个广告帐户，目前我是代luma兄管理的。现在看来广告是比较少。。。。。从一月份到现在，半年快过去了，才仅仅 70＄。
+
+
+6、参考文档；
+
+
+
+
+
+7、相关文档；
+

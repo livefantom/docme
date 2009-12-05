@@ -1,0 +1,93 @@
+Oracle数据导入导出imp/exp命令     选择自 hustbill 的 Blog  
+关键字   Oracle数据导入导出imp/exp命令 
+出处    
+ 
+ --如何在oracle中导入dmp数据库文件？
+ 2006/2/16 zhanghua first create                             
+
+     Oracle数据导入导出imp/exp就相当于oracle数据还原与备份。exp命令可以把数据从远程数据库服务器导出到本地的dmp文件，imp命令可以把dmp文件从本地导入到远处的数据库服务器中。 利用这个功能可以构建两个相同的数据库，一个用来测试，一个用来正式使用。
+ 
+执行环境：可以在SQLPLUS.EXE或者DOS（命令行）中执行，
+ DOS中可以执行时由于 在oracle 8i 中  安装目录\ora81\BIN被设置为全局路径，
+ 该目录下有EXP.EXE与IMP.EXE文件被用来执行导入导出。
+ oracle用java编写，SQLPLUS.EXE、EXP.EXE、IMP.EXE这两个文件有可能是被包装后的类文件。
+ SQLPLUS.EXE调用EXP.EXE、IMP.EXE所包裹的类，完成导入导出功能。
+ 
+下面介绍的是导入导出的实例。
+数据导出：
+ 1 将数据库TEST完全导出,用户名system 密码manager 导出到D:\daochu.dmp中
+   exp system/manager@TEST file=d:\daochu.dmp full=y
+ 2 将数据库中system用户与sys用户的表导出
+   exp system/manager@TEST file=d:\daochu.dmp owner=(system,sys)
+ 3 将数据库中的表inner_notify、notify_staff_relat导出
+    exp aichannel/aichannel@TESTDB2 file= d:\data\newsmgnt.dmp tables=(inner_notify,notify_staff_relat) 
+
+ 4 将数据库中的表table1中的字段filed1以"00"打头的数据导出
+   exp system/manager@TEST file=d:\daochu.dmp tables=(table1) query=\" where filed1 like '00%'\"
+  
+  上面是常用的导出，对于压缩，既用winzip把dmp文件可以很好的压缩。
+  也可以在上面命令后面 加上 compress=y 来实现。
+
+数据的导入
+ 1 将D:\daochu.dmp 中的数据导入 TEST数据库中。
+   imp system/manager@TEST  file=d:\daochu.dmp
+   imp aichannel/aichannel@HUST full=y  file=file= d:\data\newsmgnt.dmp ignore=y 
+   上面可能有点问题，因为有的表已经存在，然后它就报错，对该表就不进行导入。
+   在后面加上 ignore=y 就可以了。
+ 2 将d:\daochu.dmp中的表table1 导入
+ imp system/manager@TEST  file=d:\daochu.dmp  tables=(table1) 
+ 
+ 基本上上面的导入导出够用了。不少情况要先是将表彻底删除，然后导入。
+ 
+注意：
+ 操作者要有足够的权限，权限不够它会提示。
+ 数据库时可以连上的。可以用tnsping TEST 来获得数据库TEST能否连上。
+
+附录一：
+ 给用户增加导入数据权限的操作
+ 第一,启动sql*puls
+ 第二，以system/manager登陆
+ 第三，create user 用户名 IDENTIFIED BY 密码 （如果已经创建过用户，这步可以省略）
+ 第四，GRANT CREATE USER,DROP USER,ALTER USER ,CREATE ANY VIEW ,
+   DROP ANY VIEW,EXP_FULL_DATABASE,IMP_FULL_DATABASE,
+      DBA,CONNECT,RESOURCE,CREATE SESSION  TO 用户名字 
+ 第五, 运行-cmd-进入dmp文件所在的目录, 
+      imp userid=system/manager full=y file=*.dmp
+      或者 imp userid=system/manager full=y file=filename.dmp
+
+ 执行示例:
+ F:\Work\Oracle_Data\backup>imp userid=test/test full=y file=inner_notify.dmp
+
+屏幕显示
+Import: Release 8.1.7.0.0 - Production on 星期四 2月 16 16:50:05 2006
+(c) Copyright 2000 Oracle Corporation.  All rights reserved.
+
+连接到: Oracle8i Enterprise Edition Release 8.1.7.0.0 - Production
+With the Partitioning option
+JServer Release 8.1.7.0.0 - Production
+
+经由常规路径导出由EXPORT:V08.01.07创建的文件
+已经完成ZHS16GBK字符集和ZHS16GBK NCHAR 字符集中的导入
+导出服务器使用UTF8 NCHAR 字符集 (可能的ncharset转换)
+. 正在将AICHANNEL的对象导入到 AICHANNEL
+. . 正在导入表                  "INNER_NOTIFY"          4行被导入
+准备启用约束条件...
+成功终止导入，但出现警告。
+
+ 
+附录二：
+ Oracle 不允许直接改变表的拥有者, 利用Export/Import可以达到这一目的.
+  先建立import9.par,
+  然后，使用时命令如下：imp parfile=/filepath/import9.par
+  例 import9.par 内容如下：
+        FROMUSER=TGPMS        
+        TOUSER=TGPMS2     （注：把表的拥有者由FROMUSER改为TOUSER，FROMUSER和TOUSER的用户可以不同）           
+        ROWS=Y
+        INDEXES=Y
+        GRANTS=Y
+        CONSTRAINTS=Y
+        BUFFER=409600
+        file==/backup/ctgpc_20030623.dmp
+        log==/backup/import_20030623.log
+
+ 

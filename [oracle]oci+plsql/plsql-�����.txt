@@ -1,0 +1,14 @@
+bitand( ) 函数示例
+x = 5  && 二进制为 0101
+y = 6  && 二进制为 0110
+? bitand(x,y) && 返回值 4，二进制为 0100
+
+
+
+很多人都有一个疑问：ORACLE中为什么只有BITAND而没有BITOR, BITXOR
+原因是，有了BITAND, 很容易实现BITOR和BITXOR
+
+BITOR(x,y) = (x + y) - BITAND(x, y);
+
+BITXOR(x,y) = BITOR(x,y) - BITAND(x,y) = (x + y) - BITAND(x, y) * 2;
+

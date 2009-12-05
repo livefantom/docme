@@ -1,0 +1,405 @@
+CreateFile函数祥解2006-9-18 18:48:00
+CreateFile
+
+The CreateFile function creates or opens the following objects and returns a handle that can be used to access
+the object:
+	files
+	pipes
+	mailslots
+	communications resources
+	disk devices(Windows NT only)
+	consoles
+	directories(open only)
+
+CreateFile函数创建或打开下列对象，并返回一个可以用来访问这些对象的句柄。
+	文件
+	pipes
+	邮槽
+	通信资源
+	磁盘驱动器（仅适用于windowsNT）
+	控制台
+	文件夹（仅用于打开）
+
+HANDLE CreateFile(
+	LPCTSTR lpFileName,				//指向文件名的指针
+	DWORD dwDesiredAccess,				//访问模式（写/读）
+	DWORD dwShareMode,				//共享模式
+	LPSECURITY_ATTRIBUTES lpSecurityAttributes,	//指向安全属性的指针
+	DWORD dwCreationDisposition,			//如何创建
+	DWORD dwFlagsAndAttributes,			//文件属性
+	HANDLE hTemplateFile				//用于复制文件句柄
+);
+
+Parametes
+参数列表
+
+lpFileName
+	Pointer to a null-terminated string that specifies the name of the object(file, pipe, mailslot, 
+	communications resource, disk device, console, or directory) to create or open.
+	指向一个空结尾字符串。该参数指定了用于创建或打开句柄的对象。
+
+	if *lpFileName is a path, there is a default string size limit of MAX_PATH characters, This limit is
+	related to how the CreateFile function parses paths.
+	如果lpFileName的对象是一个路径，则有一个最大字符数的限制。不能超过常量(MAX_PATH).这个限制指示了
+	CreateFile函数如何解析路径.
+
+dwDesiredAccess
+	Specifies the type of access to the object. An application can obtain read access, write access,
+	read-write access, or device query access, This parameter can be any combination of the following
+	values
+	指定对象的访问方式,程序可以获得读访问权,写访问权,读写访问权或者是询问设备("device query") 访问权.
+	这个参数可以是下列值的任意组合
+	
+	Value(值)		Meaning(含义)
+	0			Specifies device query access to the object. An application can query device
+				attributes without accessing the device.
+				指定询问访问权.程序可以在不直接访问设备的情况下查询设备的属性.
+
+	GENERIC_READ		Specifies read access to the object, Data can be read from the file and the 
+				file pointer can be moved. Combine with GENERIC_WRITE for read-write access.
+				指定读访问权.可以从文件中读取数据,并且移动文件指针.可以和GENERIC_WRITE组合
+				成为"读写访问权".
+
+	GENERIC_WRITE		specifies write access to the object. Data can be written to the file and the
+				file pointer can be moved. Combine with GENERIC_READ fro read-write access
+				指定写访问权.可以从文件中写入数据,并且移动文件指针.可以和GENERIC_READ组合
+				成为"读写访问权".
+
+dwShareMode
+	Set of bit flags that specifies how the object can be shared, If dwShareMode is 0, the object cannot
+	be shared. Subsequent open operations on the object will fail, until the handle is closed.
+	设置位标志指明对象如休共享.如果参数是0, 对象不能够共享. 后续的打开对象的操作将会失败,直到该对象的句
+	柄关闭.
+
+	To share the object, use a combination of one or more of the following values:
+	使用一个或多个下列值的组合来共享一个对象.
+	Value(值)		Meaning(含义)
+	FILE_SHARE_DELETE	WindowsNT: Subsequent open operations on the object will succeed only if
+				delete access is requested.
+				WINDOWS NT:后续的仅仅请求删除访问权的打开操作将会成功.
+
+	FILE_SHARE_READ		Subsequent open operations on the object will successd only if read access
+				is requested.
+				后续的仅仅请求读访问权的打开操作将会成功.
+
+	FILE_SHARE_WRITE	Subsequent open operations on the object will succeed only if write access
+				is requested.
+				后续的仅仅请求写访问权的打开操作将会成功.
+
+lpSecurityAttributes
+	pointer to a SECURITY_ATTRIBUTES structure that determines whether the returned handle can be 
+	inherited by child processes, if lpSecurityAttributes is NULL, the handle cannot be inherited.
+	指向一个 SECURITY_ATTRIBUTES 结构的指针用于确定如何在子进程中继承这个句柄.如果这个参数是NULL,
+	则该句柄不可继承.
+
+dwCreationDisposition
+	Specifies which action to take on files that exist, and which action to take when files do not exist.
+	For more information about this parameter, see the remarks section. This parameter must be one of the
+	following values
+	指定当文件存在或者不存在时如何动作。关于这个参数更多的信息，参考批注部分。这个参数必须是一个或多个
+	下列值。
+
+	VALUE(值)		Neaning(含义)
+	CREATE_NEW		Creates a new file. The function fails if the specified file already exists
+				创建一个新文件. 如果该文件已经存在函数则会失败.
+	
+	CREATE_ALWAYS		Creates a new file. If the file exsts, the function overwrites the file and
+				clears the existing attributes.
+				创建一个新文件.如果该文件已经存在,函数将覆盖已存在的文件并清除已存在的文件属性
+
+	OPEN_EXISTING		Opens the file. The function fails if the file does not exist.
+				See the Remarks section for a discussion of why you should use the 
+				OPEN_EXISTING flag if you are using the CreateFile function for devices,
+				including the console.
+				打开一个文件,如果文件不存在函数将会失败.
+				如查你使用CreateFile函数为设备装载控制台.请查看批注中的"为什么使用
+				OPEN_EXISTING标志"的部分.
+				
+	OPEN_ALWAYS		Opens the file, if it exsts. If the file does not exist, the function creates
+				the file as if dwCreationDisposition were CREATE_NEW.
+				如果文件存在,打开文件. 如果文件不存在,并且参数中有CREATE_NEW标志,则创建文件.
+
+	TRUNCATE_EXISTING	Opens the file. Once opened, the file is truncated so that its size is zero 
+				bytes The calling process must open the file with at least GENERIC_WRITE access.
+				The function fails if the file does not exist.
+				打开一个文件,每次打开,文件将被截至0字节.调用进程必须用GENERIC_WRITE访问模式打
+				开文件.如果文件不存在则函数就会失败.
+
+dwFlagsAndatributes
+	Specifies the file attributes and flags for the file.
+	为文件指定属性和标志位
+
+	Any combination of the following attributes is acceptable for the dwFlagsAndAttributes parameter,
+	except all other file attributes override FILE_ATTRIBUTE_NORMAL.
+	该参数可以接收下列属性的任意组合.除非其它所有的文件属性忽略FILE_ATTRIBUTE_NORMAL.
+	Attribute(属性)			Meaning(标志)
+	FILE_ATTRIBUTE_ARCHIVE		The ifle should be archived. Application use this attribute to mark
+					files for backup or removal.
+					文件将被存档,程序使用此属性来标志文件去备份或移除
+
+	FILE_ATTRIBUTE_HIDDEN		The file is hidden. It is not to be included in an ordinary directory
+					listing.
+					文件被隐藏,它不会在一般文件夹列表中被装载.
+
+	FILE_ATTRIBUTE_NORMAL		The file has no other attributes set. This attribute is valid only if
+					used alone
+					文件没有被设置任何属性.
+
+	
+	FILE_ATTRIBUTE_OFFLINE		The data of the file is not immediately available. Indicates that the
+					file data has been physically moved to offline storage.
+					文件的数据没有被立即用到。指出正在脱机使用该文件。
+
+	FILE_ATTRIBUTE_READONLY		The file is read only.Applications can read the file but cannot write
+					to it or delete it
+					这个文件只可读取.程序可以读文件,但不可以在上面写入内容,也不可删除.
+
+	FILE_ATTRIBUTE_SYSTEM		The file is part of or is used exclusively by the operation system.
+					文件是系统的一部分,或是系统专用的.
+
+	FILE_ATTRIBUTE_TEMPORARY	The file is being used for temporary storage. File systems attempt
+					to keep all of the data in memory for quicker access rather than 
+					flushing the data back to mass storage. A temporary file should be 
+					deleted by the application as soon as it is no longer needed.
+					文件被使用后，文件系统将努力为（文件的）所有数据的迅迅访问保持一块
+					内存。临时文件应当在程序不用时及时删除。
+
+	Any combination of the following flags is acceptable for the dwFlagsAndAttributes parameter.
+	dwFlagAndAttributes可以接受下列标志的任意组合。
+
+	FLAG（标志）			Meaning(含义)
+	FILE_FLAG_WRITE_THROUGH		Instructs the system to write through any intermediate cache and go
+					directly to disk. The system can still cache write operations, but
+					cannot lazily flush them.
+					指示系统通过快速缓存直接写入磁盘，
+
+	FILE_FLAG_OVERLAPPED		Instructs the system to initialize the object, so that operations that
+					take a significant amount of time to process return ERROR_IO_PENDING.
+					When the operation is finished, the specified event is set to the 
+					signaled state.
+					指示系统初始化对象, 此操作将对进程设置一个引用计数并返回ERROR_IO_PENDING.
+					处理完成后, 指定对象将被设置为信号状态.
+
+					When you specify FILE_FLAG_OVERLAPPED, the file read and write functions
+					must specify an OVERLAPPED structure. That is, when FILE_FLAG_OVERLAPPED
+					is specified, an application must perform overlapped parameter(pointing
+					to an OVERLAPPED structure)to the file read and write functions.
+					This flag also enables more than one operation to be performed
+					simultaneously with the handle(a simultaneous read and write operation,
+					for example).
+					当你指定FILE_FLAG_OVERLAPPED时,读写文件的函数必须指定一个OVERLAPPED结构.
+					并且. 当FILE_FLAG_OVERLAPPED被指定, 程序必须执行重叠参数(指向OVERLAPPED
+					结构)去进行文件的读写.
+					这个标志也可以有超过一个操作去执行.
+
+	FILE_FLAG_NO_BUFFERING		Instructs the system to open the file with no intermediate buffering or
+					caching.When combined with FILE_FLAG_OVERLAPPED, the flag gives maximum
+					asynchronous performance, because the I/O does not rely on the synchronous
+					operations of the memory manager. However, some I/O operations will take
+					longer, because data is not being held in the cache.
+					指示系统不使用快速缓冲区或缓存，当和FILE_FLAG_OVERLAPPED组合,该标志给出最
+					大的异步操作量, 因为I/O不依赖内存管理器的异步操作.然而,一些I/O操作将会运行
+					得长一些,因为数据没有控制在缓存中.
+
+					An application must meet certain requirements when working with files 
+					opened with FILE_FLAG_NO_BUFFERING:
+					当使用FILE_FLAG_NO_BUFFERING打开文件进行工作时,程序必须达到下列要求:
+					
+						File access must begin at byte offsets within the file that are 
+						integer multiples of the volume's sector size.
+						文件的存取开头的字节偏移量必须是扇区尺寸的整倍数.
+						
+						File access must be for numbers of bytes that are integer 
+						multiples of the volume's sector size. For example, if the sector
+						size is 512 bytes, an application can request reads and writes of
+						512, 1024, or 2048 bytes, but not of 335, 981, or 7171bytes.
+						文件存取的字节数必须是扇区尺寸的整倍数.例如,如果扇区尺寸是512字节
+						程序就可以读或者写512,1024或者2048字节,但不能够是335,981或者7171
+						字节.
+
+						buffer addresses for read and write operations must be sector
+						aligned(aligned on addresses in memory that are integer multiples
+						of the volume's sector size).
+						进行读和写操作的地址必须在扇区的对齐位置,在内存中对齐的地址是扇区
+						尺寸的整倍数.
+
+					One way to align buffers on integer multiples of the volume sector size is
+					to use VirtualAlloc to allocate the buffers, It allocates memory that is 
+					aligned on addresses that are integer multiples of the operating system's
+					memory page size. Because both memory page and volume sector sizes are 
+					powers of 2, this memory is also aligned on addresses that are integer 
+					multiples of a volume's sector size.
+					一个将缓冲区与扇区尺寸对齐的途径是使用VirtualAlloc函数. 它分配与操作系统
+					内存页大小的整倍数对齐的内存地址.因为内存页尺寸和扇区尺寸--2都是它们的幂.
+					这块内存在地址中同样与扇区尺寸大小的整倍数对齐.
+
+					An application can determine a volume's sector size by calling the 
+					GetDiskFreeSpace function
+					程序可以通过调用GetDiskFreeSpace来确定扇区的尺寸.
+
+	FILE_FLAG_RANDOM_ACCESS
+					Indicates that the file is accessed randomly. The system can use this as
+					a hint to optimize file caching.
+					指定文件是随机访问,这个标志可以使系统优化文件的缓冲.
+
+
+	FILE_FLAG_SEQUENTIAL_SCAN	
+					Indicates that the file is to be accessed sequentially from beginning to 
+					end. The system can use this as a hint to optimize file caching. If an 
+					application moves the file pointer for random access, optimum caching may
+					not occur; however, correct operation is still guaranteed.
+					指定文件将从头到尾连续地访问.这个标志可以提示系统优化文件缓冲. 如果程序在
+					随机访问文件中移动文件指针,优化可能不会发生;然而,正确的操作仍然可以得到保
+					证
+					
+					Specifying this flag can increase performance for applications that read
+					large files using sequential access, performance gains can be even more
+					noticeable for applications that read large files mostly sequentially,
+					but occasionally skip over small ranges of bytes.
+					指定这个标志可以提高程序以顺序访问模式读取大文件的性能, 性能的提高在许多
+					程序读取一些大的顺序文件时是异常明显的.但是可能会有小范围的字节遗漏.
+
+
+	FILE_FLAG_DELETE_ON_CLOSE	Indicates that the operating system is to delete the file immediately 
+					after all of its handles have been closed, not just the handle for which
+					you specified FILE_FLAG_DELETE_ON_CLOSE.
+					指示系统在文件所有打开的句柄关闭后立即删除文件.不只有你可以指定FILE_FLAG_DELETE_ON_CLOSE
+					
+					Subsequent open requests for the file will fail, unless FILE_SHARE_DELETE
+					is used.
+					如果没有使用FILE_SHARE_DELETE,后续的打开文件的请求将会失败.
+
+	FILE_FLAG_BACKUP_SEMANTICS 	WINDOWS NT:Indicates that the file is being opened or created for a backup
+					or restore operation.The system ensures that the calling process overrides
+					file security checks, provided it has the necessary privileges. The 
+					relevant privileges are SE_BACKUP_NAME and SE_RESTORE_NAME.
+					WINDOWS NT:指示系统为文件的打开或创建执行一个备份或恢复操作. 系统保证调
+					用进程忽略文件的安全选项,倘若它必须有一个特权.则相关的特权则是SE_BACKUP_NAME
+					和SE_RESTORE_NAME.
+
+					You can also set this flag to obtain a handle to a directory. A directory
+					handle can be passed to some Win32 functions in place of a file handle.
+					你也可以使用这个标志获得一个文件夹的句柄，一个文件夹句柄能够象一个文件句柄
+					一样传给某些Win32函数。
+
+	FILE_FLAG_POSIX_SEMANTICS	Indicates that the file is to be accessed according to POSIX rules. This
+					includes allowing multiple files with names, differing only in case, for file
+					systems that support such naming. Use care when using this option because
+					files created with this flag may not be accessible by applications written
+					for MS-DOS or 16-bit Windows.
+					指明文件符合POSIX标准.这是在MS-DOS与16位Windows下的标准.
+
+	FILE_FLAG_OPEN_REPARSE_POINT	Specifying this flag inhibits the reparse behavior of NTFS reparse points.
+					When the file is opened, a file handle is returned, whether the filter that
+					controls the reparse point is operational or not. This flag cannot be used
+					with the CREATE_ALWAYS flag.
+					指定这个标志制约NTFS分区指针.该标志不能够和CREAT_ALWAYS一起使用.
+
+	FILE_FLAG_OPEN_NO_RECALL	Indicates that the file data is requested,but it should continue to reside in
+					remote storage. It should not be transported back to local storage. This flag
+					is intended for use by remote storage systems or the Hierarchical Storage
+					Management system.
+					指明需要文件数据,但是将继续从远程存储器中接收.它不会将数据存放在本地存储器中.
+					这个标志由远程存储系统或等级存储管理器系统使用.
+
+hTemplateFile
+	Specifies a handle with GENERIC_READ access to a template file. The template file supplies file attributes and
+	extended attributes for the file being created.
+	为GENERIC_READ访问的模式指定一个句柄到模板文件.模板文件在文件开始创建后提供文件属性和扩展属性.
+
+Return Values
+返回值
+
+If the function succeeds, the return value is an open handle to the specified file. If the specified file exists before
+the function call and dwCreation is CREATE_ALWAYS or OPEN_ALWAYS, a call to GetLastError returns ERROR_ALREADY_EXISTS
+(even though the function has succeeded). If the file does not exist before the call, GetLastError returns zero.
+如果函数成功,返回一个打开的指定文件的句柄.如果指定文件在函数调用前已经存在并且dwCreation参数是CREATE_ALWAYS 或者
+OPEN_ALWAYS,调用GetLastError就会返回ERROR_ALREADY_EXISTS(表示函数成功). 如果函数文件在调用前不存在则会返回0.
+
+If the function fails, the return value is INVALID_HANDLE_VALUE.To get extended error information, call GetLastError.
+如果函数失败,返会值会是INVALID_HANDLE_VALUE. 更多的错误信息可以调用GetLastError来获得.
+
+
+
+
+----------------------------------------------------------------------------------------------------
+
+ 
+ 使用CreateFile, ReadFile, WriteFile在Windows NT/2000/XP下读写绝对扇区的方法     
+也就是在CreateFile的时候打开文件名指定:  “\\.\Device”就可以了.
+
+因为代码比较短, 所以我不做注释, 相信大家看代码就能明白意思了.
+
+另外这里读写的都是软盘A盘第0扇区, 如果想读写其他的扇区, 那么可以使用API SetFilePointer.
+
+读扇区的方法(下面的代码演示从A盘的第0扇区读出数据, 写入到文件BOOT.BIN中):
+
+#include <windows.h>
+#include <assert.h>
+#include <stdio.h>
+
+void main()
+{
+    HANDLE hFile;
+    hFile = CreateFile("\\\\.\\A:",
+                       GENERIC_READ,
+                       FILE_SHARE_READ,
+                       NULL,
+                       OPEN_EXISTING,
+                       0, 
+                       NULL);
+    assert(hFile && "CreateFile failed!");
+
+    PBYTE pBuffer = (PBYTE)malloc(512);
+    assert(pBuffer && "Allocate memory failed!");
+    DWORD dwLen;
+    ReadFile(hFile, pBuffer, 512, &dwLen, NULL);
+   
+    FILE * fp;
+    fp = fopen("boot.bin", "wb");
+    assert(fp && "Open file failed!");
+    fwrite(pBuffer, 512, 1, fp);
+    fclose(fp);
+
+    CloseHandle(hFile);
+
+    free(pBuffer);
+}
+
+
+那么相应的, 写扇区的方法的就是这样的咯(以下代码演示从BOOT.BIN中读出数据写入到A盘第0扇区):
+
+#include <windows.h>
+#include <assert.h>
+#include <stdio.h>
+
+void main()
+{
+    HANDLE hFile;
+    hFile = CreateFile("\\\\.\\A:",
+                       GENERIC_WRITE,
+                       FILE_SHARE_WRITE,
+                       NULL,
+                       OPEN_EXISTING,
+                       0, 
+                       NULL);
+    assert(hFile && "CreateFile failed!");
+
+    PBYTE pBuffer = (PBYTE)malloc(512);
+    assert(pBuffer && "Allocate memory failed!");
+        
+    FILE * fp;
+    fp = fopen("boot.bin", "rb");
+    assert(fp && "Open file failed!");
+    fread(pBuffer, 512, 1, fp);
+    fclose(fp);
+    
+    DWORD dwLen;
+    WriteFile(hFile, pBuffer, 512, &dwLen, NULL);
+
+    CloseHandle(hFile);
+
+    free(pBuffer);
+}
+
+

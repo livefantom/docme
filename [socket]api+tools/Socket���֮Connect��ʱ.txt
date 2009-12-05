@@ -1,0 +1,70 @@
+网络编程中socket的分量我想大家都很清楚了，socket也就是套接口，在套接口编程中，提到超时的概念，我们一下子就能想到3个：发送超时，接收超时，以及select超时（注：select函数并不是只用于套接口的，但是套接口编程中用的比较多），在connect到目标主机的时候，这个超时是不由我们来设置的。不过正常情况下这个超时都很长，并且connect又是一个阻塞方法，一个主机不能连接，等着connect返回还能忍受，你的程序要是要试图连接多个主机，恐怕遇到多个不能连接的主机的时候，会塞得你受不了的。我也废话少说，先说说我的方法，如果你觉得你已掌握这种方法，你就不用再看下去了，如果你还不了解，我愿意与你分享。本文是已在Linux下的程序为例子，不过拿到Windows中方法也是一样，无非是换几个函数名字罢了。
+　　 Linux中要给connect设置超时，应该是有两种方法的。一种是该系统的一些参数，这个方法我不讲，因为我讲不清楚:P，它也不是编程实现的。另外一种方法就是变相的实现connect的超时，我要讲的就是这个方法，原理上是这样的：
+　　1．建立socket
+　　2．将该socket设置为非阻塞模式
+　　3．调用connect()
+　　4．使用select()检查该socket描述符是否可写（注意，是可写）
+　　5．根据select()返回的结果判断connect()结果
+　　6．将socket设置为阻塞模式（如果你的程序不需要用阻塞模式的，这步就省了，不过一般情况下都是用阻塞模式的，这样也容易管理）
+　　如果你对网络编程很熟悉的话，其实我一说出这个过程你就知道怎么写你的程序了，下面给出我写的一段程序，仅供参考。
+　　/******************************
+　　* Time out for connect() 
+　　* Write by Kerl W
+　　******************************/
+　　#include <sys/socket.h>
+　　#include <sys/types.h>
+　　#define TIME_OUT_TIME 20 //connect超时时间20秒
+　　int main(int argc , char **argv)
+　　{
+　　 ………………
+　　 int sockfd = socket(AF_INET, SOCK_STREAM, 0);
+　　 if(sockfd < 0) exit(1);
+　　 struct sockaddr_in serv_addr;
+　　 ………//以服务器地址填充结构serv_addr
+　　 int error=-1, len;
+　　 len = sizeof(int);
+　　 timeval tm;
+　　 fd_set set;
+　　 unsigned long ul = 1;
+　　 ioctl(sockfd, FIONBIO, &ul); //设置为非阻塞模式
+　　 bool ret = false;
+　　 if( connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) == -1)
+　　 {
+　　 tm.tv_set = TIME_OUT_TIME;
+　　 tm.tv_uset = 0;
+　　 FD_ZERO(&set);
+　　 FD_SET(sockfd, &set);
+　　 if( select(sockfd+1, NULL, &set, NULL, &tm) > 0)
+　　 {
+　　 getsockopt(sockfd, SOL_SOCKET, SO_ERROR, &error, (socklen_t *)&len);
+　　 if(error == 0) ret = true;
+　　 else ret = false;
+　　 } else ret = false;
+　　 }
+　　 else ret = true;
+　　 ul = 0;
+　　 ioctl(sockfd, FIONBIO, &ul); //设置为阻塞模式
+　　 if(!ret) 
+　　 {
+　　 close( sockfd );
+　　 fprintf(stderr , "Cannot Connect the server!\n");
+　　 return;
+　　 }
+　　 fprintf( stderr , "Connected!\n");
+　　 //下面还可以进行发包收包操作
+　　 ……………
+　　}
+　　 以上代码片段，仅供参考，也是为初学者提供一些提示，主要用到的几个函数，select, ioctl, getsockopt都可以找到相关资料，具体用法我这里就不赘述了，你只需要在linux中轻轻的敲一个man <函数名>就能够看到它的用法。
+　　 此外我需要说明的几点是，虽然我们用ioctl把套接口设置为非阻塞模式，不过select本身是阻塞的，阻塞的时间就是其超时的时间由调用select的时候的最后一个参数timeval类型的变量指针指向的timeval结构变量来决定的，timeval结构由一个表示秒数的和一个表示微秒数（long类型）的成员组成，一般我们设置了秒数就行了，把微妙数设为0（注：1秒等于100万微秒）。而select函数另一个值得一提的参数就是上面我们用到的fd_set类型的变量指针。调用之前，这个变量里面存了要用select来检查的描述符，调用之后，针对上面的程序这里面是可写的描述符，我们可以用宏FD_ISSET来检查某个描述符是否在其中。由于我这里只有一个套接口描述符，我就没有使用FD_ISSET宏来检查调用select之后这个sockfd是否在set里面，其实是需要加上这个判断的。不过我用了getsockopt来检查，这样才可以判断出这个套接口是否是真的连接上了，因为我们只是变相的用select来检查它是否连接上了，实际上select检查的是它是否可写，而对于可写，是针对以下三种条件任一条件满足时都表示可写的：
+　　1）套接口发送缓冲区中的可用控件字节数大于等于套接口发送缓冲区低潮限度的当前值，且或者i)套接口已连接，或者ii)套接口不要求连接（UDP方式的）
+　　2）连接的写这一半关闭。
+　　3）有一个套接口错误待处理。
+　　这样，我们就需要用getsockopt函数来获取套接口目前的一些信息来判断是否真的是连接上了，没有连接上的时候还能给出发生了什么错误，当然我程序中并没有标出那么多状态，只是简单的表示可连接/不可连接。
+　　 下面我来谈谈对这个程序测试的结果。我针对3种情形做了测试：
+　　1． 目标机器网络正常的情况
+　　 可以连接到目标主机，并能成功以阻塞方式进行发包收包作业。
+　　2． 目标机器网络断开的情况
+　　 在等待设置的超时时间（上面的程序中为20秒）后，显示目标主机不能连接。
+　　3． 程序运行前断开目标机器网络，超时时间内，恢复目标机器的网络
+　　在恢复目标主机网络连接之前，程序一只等待，恢复目标主机后，程序显示连接目标主机成功，并能成功以阻塞方式进行发包收包作业。
+　　 以上各种情况的测试结果表明，这种设置connect超时的方法是完全可行的。我自己是把这种设置了超时的connect封装到了自己的类库，用在一套监控系统中，到目前为止，运行还算正常。这种编程实现的connect超时比起修改系统参数的那种方法的有点就在于它只用于你的程序之中而不影响系统。

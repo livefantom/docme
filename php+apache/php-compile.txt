@@ -1,0 +1,1 @@
+--prefix=$HOME/php5 --with-apxs2=$HOME/apache/bin/apxs --with-config-file-path=$HOME/php5/lib --with-curl --with-http-curl-requests --with-http-zlib-compression --with-http-magic-mime --with-http-shared-deps --with-oci8=$ORACLE_HOME --enable-sigchild --with-xmlrpc

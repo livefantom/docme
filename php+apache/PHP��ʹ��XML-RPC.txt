@@ -1,0 +1,173 @@
+PHP中使用XML-RPC构造Web Service简单入门 
+（加入日期:2006-3-9 点击数:3746）
+【收藏文章】【对此文发表评论】【编程爱好者论坛】【保存文章至硬盘】【打印文章】 
+ 
+ 
+
+* 作者：heiyeluren
+* 时间：2006-03-05
+* 博客：http://blog.csdn.net/heiyeshuwu
+
+
+[  Web Service介绍 ]
+
+Web Service就是为了异构系统的通信而产生的，它基本的思想就是使用基于XML的HTTP的远程调用提供一种标准的机制，而省去建立一种新协议的需求。目前进行Web Service通信有两种协议标准，一种是XML-RPC，另外一种是SOAP。XML-RPC比较简单，出现时间比较早，SOAP比较复杂，主要是一些需要稳定、健壮、安全并且复杂交互的时候使用。
+
+PHP中集成了XML-RPC和SOAP两种协议的访问，都是集中在xmlrpc扩展当中。另外，在PHP的PEAR中，不管是PHP 4还是PHP 5，都已经默认集成了XML-RPC扩展，而且该扩展跟xmlrpc扩展无关，能够独立实现XML-RPC的协议交互，如果没有xmlrpc扩展，建议使用PEAR::XML-RPC扩展。
+
+我们这里主要是以XML-RPC来简单描述Web Service的交互过程，部分内容来自PHP手册，更详细内容，建议参考手册。
+
+
+[  安装xmlrpc扩展 ]
+
+如果你的系统中没有安装xmlrpc的php扩展，那么请正确安装。
+
+在Windows平台下，首先把PHP安装目录下的扩展php_xmlrpc.dll放到C:\Windows或者C:\Winnt目录下，(PHP4的扩展在C:\php\extensions目录中，PHP5的扩展在C:\php\ext目录中)，同时在C:\Windows\php.ini或者C:\Winnt\php.ini中把extension=php_xmlrpc.dll前面的分号";"去掉，然后重启Web服务器后查看phpinfo()有没有XML-RPC项目就能够确定是否已经正确安装xmlrpc扩展。
+
+在Unix/Linux平台下，如果没有安装xmlrpc扩展，请在重新编译PHP，在configure的时候请加入 --with-xmlrpc 选项，然后查看phpinfo()看是否正常安装xmlrpc。
+
+(注意：以下操作都是建立在xmlrpc扩张正常安装前提下，请务必正确安装。)
+
+
+[  XML-RPC工作原理 ]
+
+XML-RPC大致就是整个过程就是使用XML来进行通信。首先构造一个RPC 服务器端用来出来从RPC客户端传递过来的使用XML封装的请求，并且把处理结果通过XML的形式返回给RPC客户端，客户端就去分析XML获取自己需要的数据。
+
+XML-RPC的服务器端必须有现成的函数提供给客户端调用，并且客户端提交的请求中的函数和方法必须和服务器端的一致，否则将无法获取所需要的结果。
+
+下面我进行简单的代码来描述整个过程。
+
+
+[  XML-RPC实践 ]
+
+服务器端使用xmlrpc_server_create函数产生一个服务器端，然后把需要需要暴露的RPC调用接口进行注册，接受RPC客户端POST过来的XML数据，然后进行处理，处理结果通过XML的形式显示给客户端。
+
+代码如下： rpc_server.php
+
+<?php 
+/**
+* 函数：提供给RPC客户端调用的函数
+* 参数：
+* $method 客户端需要调用的函数
+* $params 客户端需要调用的函数的参数数组
+* 返回：返回指定调用结果
+*/
+function rpc_server_func($method, $params) {
+$parameter = $params[0];
+   if ($parameter == "get")
+   { 
+       $return = ''This data by get method''; 
+   }
+   else
+   {
+       $return = ''Not specify method or params'';
+   } 
+   return $return; 
+} 
+
+//产生一个XML-RPC的服务器端
+$xmlrpc_server = xmlrpc_server_create(); 
+
+//注册一个服务器端调用的方法rpc_server，实际指向的是rpc_server_func函数
+xmlrpc_server_register_method($xmlrpc_server, "rpc_server", "rpc_server_func"); 
+
+//接受客户端POST过来的XML数据
+$request = $HTTP_RAW_POST_DATA;
+
+//执行调用客户端的XML请求后获取执行结果
+$xmlrpc_response = xmlrpc_server_call_method($xmlrpc_server, $request, null); 
+
+//把函数处理后的结果XML进行输出
+header(''Content-Type: text/xml''); 
+echo $xmlrpc_response; 
+
+//销毁XML-RPC服务器端资源
+xmlrpc_server_destroy($xmlrpc_server); 
+?>
+
+服务器端构造好了，那么再构造我们的RPC客户端。客户端大致通过Socket访问XML-RPC服务器端的80端口，然后把需要调用的RPC接口封装到XML里，通过POST请求提交给RPC服务器端，最后获取服务器端返回结果。
+
+代码如下：rpc_client.php
+
+<?php
+/**
+* 函数：提供给客户端进行连接XML-RPC服务器端的函数
+* 参数：
+* $host  需要连接的主机
+* $port  连接主机的端口
+* $rpc_server XML-RPC服务器端文件
+* $request  封装的XML请求信息
+* 返回：连接成功成功返回由服务器端返回的XML信息，失败返回false
+*/
+function rpc_client_call($host, $port, $rpc_server, $request) { 
+
+   //打开指定的服务器端
+   $fp = fsockopen($host, $port); 
+
+   //构造需要进行通信的XML-RPC服务器端的查询POST请求信息
+   $query = "POST $rpc_server HTTP/1.0\nUser_Agent: XML-RPC Client\nHost: ".$host."\nContent-Type: text/xml\nContent-Length: ".strlen($request)."\n\n".$request."\n"; 
+
+   //把构造好的HTTP协议发送给服务器，失败返回false
+   if (!fputs($fp, $query, strlen($query))) 
+   { 
+       $errstr = "Write error"; 
+       return false; 
+   } 
+   
+   //获取从服务器端返回的所有信息，包括HTTP头和XML信息
+   $contents = ''''; 
+   while (!feof($fp))
+   { 
+       $contents .= fgets($fp); 
+   } 
+
+   //关闭连接资源后返回获取的内容
+   fclose($fp); 
+   return $contents; 
+} 
+
+//构造连接RPC服务器端的信息
+$host  = ''localhost''; 
+$port  = 80; 
+$rpc_server = ''/~heiyeluren/rpc_server.php'';
+
+//把需要发送的XML请求进行编码成XML，需要调用的方法是rpc_server，参数是get
+$request = xmlrpc_encode_request(''rpc_server'', ''get''); 
+
+//调用rpc_client_call函数把所有请求发送给XML-RPC服务器端后获取信息
+$response = rpc_client_call($host, $port, $rpc_server, $request); 
+
+//分析从服务器端返回的XML，去掉HTTP头信息，并且把XML转为PHP能识别的字符串
+$split = ''<?xml version="1.0" encoding="iso-8859-1"?>'';
+$xml =  explode($split, $response);
+$xml = $split . array_pop($xml);
+$response = xmlrpc_decode($xml);
+
+//输出从RPC服务器端获取的信息
+print_r($response);
+
+?> 
+
+
+大致我们上面的例子就是提交一个叫做rpc_server的方法过去，参数是get，然后获取服务器端的返回，服务器端返回的XML数据是：
+
+<?xml version="1.0" encoding="iso-8859-1"?>
+<methodResponse>
+<params>
+<param>
+  <value>
+   <string>This data by get method</string>
+  </value>
+</param>
+</params>
+</methodResponse>
+
+那么我们再通过xmlrpc_decode函数把这个XML编码为PHP的字符串，我们就能够随意处理了，整个Web Service交互完成。
+
+
+[  结束语 ]
+
+不管是XML-RPC也好，SOAP也罢，只要能够让我们稳定、安全的进行远程过程的调用，完成我们的项目，那么就算整个Web Service就是成功的。另外，如果可以的话，也可以尝试使用PEAR中的XML-RPC来实现上面类似的操作，说不定会更简单，更适合你使用。
+
+简单的使用XML-RPC进行Web Service交互就完成了，部分代码参考PHP手册，想获取详细信息建议参考手册，如果文章有不正确，请指正。
+ 

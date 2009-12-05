@@ -1,0 +1,73 @@
+WinDump用法---Win平台下的Tcpdump
+作者：      来源：zz     发表时间：2006-07-05     浏览次数： 14791      字号：大  中  小
+
+WinDump使用提示 
+
+基本用法：
+windump [ -aBdDeflnNOpqRStvxX ] [ -c count ] [ -F file ] [ -i interface ] [ -m module ] [ -r file ] [ -s snaplen ] [ -T type ] [ -w file ] [ -E algo:secret ] [ expression ]
+主要参数有选项和表达式两类。下面说明几个必要的选项和表达式：
+-i 指定要监听的网络接口，可以使用windump -D 列出当前系统中所有的网络设备接口，不指定的话是设备列表中找得的第一个。例如：
+./WinDump.exe -D
+1.\Device\NPF_GenericNdisWanAdapter (Generic NdisWan adapter)
+2.\Device\NPF_{6AA36CF4-E4FD-49BF-93E5-DC29AB8A3AA5} (SiS NIC SISNIC (Microsoft' s Packet Scheduler) )
+则
+./WinDump.exe
+./WinDump.exe -i 1
+./WinDump.exe -i \\Device\\NPF_GenericNdisWanAdapter
+都是监听第一个网络接口设备Generic NdisWan adapter。
+./WinDump.exe -i 2
+./WinDump.exe -i \\Device\\NPF_{6AA36CF4-E4FD-49BF-93E5-DC29AB8A3AA5}
+都是监听第二个网络接口设备SiS NIC SISNIC (Microsoft' s Packet Scheduler)。
+
+如果不指定表达式，所有通过指定接口的packet都输出，否则只把表达式expression为真的输出。
+最基本的表达式是这样的：
+[proto] [dir] [type] [id]
+
+proto 协议，可以是ether, fddi, tr, ip, ip6, arp, rarp, decnet, tcp , udp中任一个或它们的表达式组合，如果不指定，所有和后面的type一致的都考虑在内。 
+dir packet传输的方向，可以是src, dst中的任一个或它们的表达式组合。不指定的话，相当于src or dst 。
+type 指定后面的id是网络地址、主机地址还是端口号，可以是host, net ,port中任一个，如果不指定，默认为host。
+id 就是希望监听的网络或主机或端口地址。
+
+一个覆盖所有元素的表达式如下：
+ether src host 00:11:D8:6A:33:22
+./WinDump.exe -i 2 ether src host 00:11:D8:6A:33:22
+监听所有从本地网卡向外发的packet，其中00:11:D8:6A:33:22是本地网卡的mac地址。
+./WinDump.exe -i 2 udp dst port 135
+监听所有发给本地135 udp端口的packet。
+
+更复杂的表达式是以上基本的表达式的逻辑组合，可用于组合的关键字有and, or, not，同时构成基本表达式的四类运算都是可选，不是必须的，比如：“host foo and not port ftp and not port ftp-data”，其中foo代表主机名，其他都是关键字。
+
+此外，有gateway, broadcast , multicast , mask , protochain , proto , less , greater 四个关键字和一些算术表达式、逻辑符合等。
+gateway foo 其中，foo是主机名，如果某个packet以foo为gateway，表达式为真，也就是该packet的ether源或目的地址是foo，而ip源和目的地址都不是foo。
+broadcast,multicast 跟在ether或者ip、ip6后面表示某个packet是广播包、多播包，比如“ether broadcast”，“ip multicast”。
+mask 和net一起说明网络地址，例如“net 192.168.0 mask 255.255.255.0”。
+protochain 跟在ip、ip6后面说明更上层的协议字，比如“ip protochain 6”。
+proto 跟在ether或者ip、ip6后面表示更上层的协议，跟在“ether proto”之后的可以是ip, ip6, arp, rarp, atalk, aarp, decnet, sca, lat, mopdl, moprc, iso，跟在“ip proto”或“ip6 proto”之后的可以是icmp, icmp6, igmp, igrp, pim, ah, esp, udp, tcp，注意对于有些本身就是关键字的要加“\”转义，比如“ether proto \ip”。
+
+其他表达式是这样的格式：
+expr relop expr
+其中，relop 可以是 >, <, >=, <=, =, !=, 中任一个，expr是由C语言规范描述的整数常量、二进制运算符（+, -, *, /, &, |）、len（取长度的关键字）、包数据构成，包数据这样访问：
+proto [ offset : size ] proto是ether, fddi, tr, ip, arp, rarp, tcp, udp, icmp , ip6中任一个，表示要取的数据是该协议头范围内的，相对于PDU开始处的偏移由offset指定，size可选、说明要取数据的字节数，可以是1～4，默认是1。例如，
+“ether[0] & 1 != 0”匹配所有multicast数据包，因为01:00:5e:00:00:00到 01:00:5e:7f:ff:ff都是多播地址。
+“ip[0] & 0xf != 5”匹配所有带选项的ip包，根据ip协议，“ip[0] & 0xf”取到的是IP协议头长度，而不带选项的ip协议头长度刚好是5。
+“ip[6:2] & 0x1fff = 0”，“ip[6:2] & 0x1fff”取到该ip包的Fragment Offset，所以匹配所有不分段的ip包或所有分段ip包中的第一段。
+
+其它操作法有!（相当于not ）、&&（相当于and ）、||（相当于or）。
+
+使用举例：
+./WinDump.exe -i 2 not arp and ether host not 02:01:00:00:00:00
+抓取所有非arp协议、且源或目的主机的ether地址都不是02:01:00:00:00:00的packet。
+
+windump.exe -i 2 -w cap ether host 00:11:D8:6A:33:22
+抓取所有源或目的主机的ether地址是00:11:D8:6A:33:22（本地网卡的mac地址）的packet，但不知道屏幕上输出，而是把所有抓获的raw packet写入文件cap中。
+windump.exe -r cap
+读取刚才的输出文件cap,对抓获的所有packet进行解析输出。
+经粗略分析，windump输出的raw packet文件格式如下：
+文件头24个字节：“D4 C3 B2 A1 02 00 04 00 00 00 00 00 00 00 00 00 60 00 00 00 01 00 00 00 ”，具体含义不明确。
+接下来是所有raw packet连续存放的数据，对于每个raw packet依次有：
+8个字节的timestamp（时间戳）
+ether frame header（7 bytes Preamble,1 byte SOF,6 bytes DA, 6 bytes SA,2bytes length/type）
+ether frame payload（更上层协议PDU）
+
+windump.exe -r cap 只是在屏幕上依次输出每个packet对应的时间戳、ether frame payload 中PDU协议类型，再是与该协议相关的简单信息。
+windump.exe -r cap -x 除了输出基本的信息之外，还把ether frame payload以十六进制输出。

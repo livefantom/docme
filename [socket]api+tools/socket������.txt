@@ -1,0 +1,7 @@
+WSAECONNRESET (10054) Connection reset by peer. 
+
+存在的连接被远程主机强制关闭。通常原因为：远程主机上对等方应用程序突然停止运行，
+或远程主机重新启动，或远程主机在远程方套接字上使用了“强制”关闭（参见setsockopt 
+(SO_LINGER)）。另外，在一个或多个操作正在进行时，如果连接因“keep-alive”活动检测
+到一个失败而中断，也可能导致此错误。此时，正在进行的操作以错误码WSAENETRESET 
+失败返回，后续操作将失败返回错误码WSAECONNRESET。

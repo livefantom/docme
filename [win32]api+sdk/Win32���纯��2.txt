@@ -1,0 +1,116 @@
+如何从Internet上有效而稳定地下载文件
+作者:hangwire
+
+下载本文源程序 
+  如何从Internet上有效而稳定地下载文件 ，这是很多网络应用程序要考虑的重要问题，本文提供的代码段针对这个问题进行了初步的探索。希望能够抛砖引玉，对各位编程人员有所帮助。
+
+  UINT InternetGetFile (HINTERNET IN hOpen, 
+CHAR *szUrl, 
+CHAR *szFileName, 
+HWND hwndProgress, 
+int idStatusText, 
+int idProgressBar);
+
+这里返回值的类型为UINT，如果成功返回0，否则返回非零值。为了使用这个函数，只需要提供一个有效的HINTERNET句柄，这个句柄可以通过标准的InternetOpen()掉用来获得。如果你愿意的话，你还可以将一个句柄提供给进度窗口（ID为一静态控制的标示符，用来显示状态），在这个函数的头几行代码中声明一些变量。
+
+  DWORD dwSize;
+这个变量被用于存储每次调用InternetReadFile读取了多少数据。
+
+  CHAR szHead[] = "Accept: */*\r\n\r\n";
+用于存储多个HTTP头信息。如果在调用InternetOpenUrl时不传递着个头信息，则只允许你打开文本文件！
+
+  VOID* szTemp[16384];
+缓冲变量，可以存储来自Internet的16KB的文件数据。
+
+  HINTERNET hConnect;
+这是一个HINTERNET句柄，包含请求结果（来自InternetOpenUrl）
+
+  FILE * pFile;
+标准的C文件句柄（必须包含stdio.h）。如果你愿意，可以使用Win32处理文件的API
+
+  if (!(hConnect = InternetOpenUrlA (hOpen, szUrl, szHead, lstrlenA (szHead), INTERNET_FLAG_DONT_CACHE | INTERNET_FLAG_PRAGMA_NOCACHE | INTERNET_FLAG_RELOAD, 0)))
+{
+return INTERNET_ERROR_OPENURL;
+}
+  此调用可以打开一个使用URL的Internet文件句柄。标志表示这个文件总是被读取，而不是缓存（cache）。如果失败，则此函数返回错误，你可以给定INTERNET_ERROR_OPENURL任何值。必须为这个函数定义所有的错误信息。也可以用一个数字替代。
+
+  if(!(pFile = fopen(szFileName, "wb" )))
+{
+return INTERNET_ERROR_FILEOPEN;
+}
+此调用根据给定的文件名打开文件。如果失败则返回另一个用户定义的错误。
+
+  DWORD dwByteToRead = 0;
+DWORD dwSizeOfRq = 4;
+DWORD dwBytes = 0;
+这三个值分别存储文件的大小，HttpQueryInfo内容的大小和总共读取的字节数。
+
+  if (!HttpQueryInfo(hConnect, HTTP_QUERY_CONTENT_LENGTH | HTTP_QUERY_FLAG_NUMBER, (LPVOID)&dwByteToRead, &dwSizeOfRq, NULL))
+{
+dwByteToRead = 0;
+}
+此调用可以获得文件的大小。如果失败则dwByteToRead被置为0，并且当文件被下载时不会显示百分比和总数
+
+  DWORD start;
+DWORD end;
+DWORD time;
+time = 10;
+start = timeGetTime();
+使用这些bit必须包含mmsystem.h并链接winmm.lib，它们用于时间选择，告诉用户下载的速度。例子代码只统计了下载速度，你可以扩展这个功能，比如估计还剩多少时间。
+
+  do
+{
+if (!InternetReadFile(hConnect, szTemp, 16384, &dwSize))
+{
+fclose (pFile);
+return INTERNET_ERROR_READFILE;
+}
+此调用循环中，每次下载一个16KB的数据块。如果download请求失败，则文件被关闭并返回错误。
+
+  if (!dwSize)
+break;
+else
+fwrite(szTemp, sizeof(char), dwSize, pFile);
+如果dwSize为0，则意味着一个EOF，循环退出。否则由InternetReadFile读取的数据内容被写到本地文件中。
+
+  dwBytes+=dwSize;
+if(dwByteToRead && hwndProgress)
+{
+SendDlgItemMessageA(hwndProgress, idProgressBar, WM_USER+2, (dwBytes*100)/dwByteToRead, 0);
+UpdateWindow(hwndProgress);
+}
+这个代码中，dwBytes是从文件读取的数据量，它不断增加，如果文件长度是有效的，则进度窗口句柄被指定，进度条被更新已表示下载进度。
+
+  FLOAT fSpeed = 0;
+fSpeed = (float)dwBytes;
+fSpeed /= ((float)time)/1000.0f;
+fSpeed /= 1024.0f;
+这些bit代码用于根据所花时间计算下载速度和读取的数据量。
+
+  if(hwndProgress)
+{
+char s[260];
+sprintf(s, "%d KB / %d KB @ %1.1f KB/s", dwBytes/1024, dwByteToRead/1024, fSpeed);
+SetDlgItemTextA(hwndProgress, idStatusText, s);
+UpdateWindow(hwndProgress);
+}
+设置和处理进度窗口的状态文本，表示下载的文件大小和下载速度。
+
+  end = timeGetTime();
+time = end - start;
+if(time == 0)
+time = 10;
+
+时间被更新
+
+} // do
+while (TRUE);
+
+循环结束
+fflush (pFile);
+fclose (pFile);
+return 0;
+}
+最后，函数结束，关闭文件并清除硬件驱动的缓冲。返回0表示成功。
+
+  使用这个代码段，按照本文所描述的那样，你可以自己编写一个程序来从Internet上有效地、稳定地下载文件。

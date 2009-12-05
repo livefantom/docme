@@ -1,0 +1,37 @@
+Oracle/PLSQL: Mod Function
+
+--------------------------------------------------------------------------------
+
+In Oracle/PLSQL, the mod function returns the remainder of m divided by n.
+
+The syntax for the mod function is:
+
+mod( m, n )
+
+The mod is calculated as:
+
+m - n * floor(m/n)
+
+
+
+Note:
+
+The mod function uses the floor function in its formula, whereas the remainder function uses the round function in its formula.
+
+The mod function returns m if n is 0.
+
+
+
+Applies To:
+
+Oracle 8i, Oracle 9i, Oracle 10g, Oracle 11g 
+
+
+For example:
+
+mod(15, 4) would return 3 
+mod(15, 0) would return 15 
+mod(11.6, 2) would return 1.6 
+mod(11.6, 2.1) would return 1.1 
+mod(-15, 4) would return -3 
+mod(-15, 0) would return -15 

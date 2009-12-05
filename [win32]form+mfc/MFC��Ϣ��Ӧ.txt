@@ -1,0 +1,116 @@
+MFC消息响应机制分析  
+
+ 浙江大学计算机系 胡朝晖 陈奇 俞瑞钊  
+
+---- 摘要：
+
+
+---- MFC是Windows下程序设计的最流行的一个类库，但是该类库比较庞杂，尤其是它的消息映射机制，更是涉及到很多低层的东西，我们在这里，对它的整个消息映射机制进行了系统的分析，可以帮助程序开发人员对MFC的消息映射机制有一个比较透彻的了解。
+
+
+---- 关键词：面向对象 消息映射 MFC 程序设计 
+
+一．引言
+---- VC++的MFC类库实际上是Windows下C++编程的一套最为流行的类库。MFC的框架结构大大方便了程序员的编程工作，但是为了更加有效、灵活的使用MFC编程，了解MFC的体系结构往往可以使编程工作事半功倍。它合理的封装了WIN32 API函数，并设计了一套方便的消息映射机制。但这套机制本身比较庞大和复杂，对它的分析和了解无疑有助于我们写出更为合理的高效的程序。这里我们简单的分析MFC的消息响应机制，以了解MFC是如何对Windows的消息加以封装，方便用户的开发。 
+
+二．SDK下的消息机制实现
+---- 这里简单的回顾一下SDK下我们是如何进行Windows的程序开发的。一般来说，Windows的消息都是和线程相对应的。即Windows会把消息发送给和该消息相对应的线程。在SDK的模式下，程序是通过GetMessage函数从和某个线程相对应的消息队列里面把消息取出来并放到一个特殊的结构里面，一个消息的结构是一个如下的STRUCTURE。 
+
+typedef struct tagMSG {
+                  HWND   hwnd;
+                  UINT   message;
+                  WPARAM wParam;
+                  LPARAM lParam;
+                  DWORD  time;
+                  POINT  pt;
+}MSG;
+
+
+
+
+---- 其中hwnd表示和窗口过程相关的窗口的句柄，message表示消息的ID号，wParam和lParam表示和消息相关的参数，time表示消息发送的时间，pt表示消息发送时的鼠标的位置。
+
+
+---- 然后TranslateMessage函数用来把虚键消息翻译成字符消息并放到响应的消息队列里面，最后DispatchMessage函数把消息分发到相关的窗口过程。然后窗口过程根据消息的类型对不同的消息进行相关的处理。在SDK编程过程中，用户需要在窗口过程中分析消息的类型和跟消息一起的参数的含义，做不同的处理，相对比较麻烦，而MFC把消息调用的过程给封装起来，使用户能够通过ClassWizard方便的使用和处理Windows的各种消息。 
+
+三．MFC的消息实现机制
+---- 我们可以看到，在MFC的框架结构下，可以进行消息处理的类的头文件里面都会含有DECLARE_MESSAGE_MAP()宏,这里主要进行消息映射和消息处理函数的声明。可以进行消息处理的类的实现文件里一般都含有如下的结构。 
+
+BEGIN_MESSAGE_MAP(CInheritClass, CBaseClass)
+	//{{AFX_MSG_MAP(CInheritClass)
+	//}}AFX_MSG_MAP
+END_MESSAGE_MAP()
+
+
+---- 这里主要进行消息映射的实现和消息处理函数的实现。
+
+---- 所有能够进行消息处理的类都是基于CCmdTarget类的，也就是说CCmdTarget类是所有可以进行消息处理类的父类。CCmdTarget类是MFC处理命令消息的基础和核心。
+
+
+---- 同时MFC定义了下面的两个主要结构: 
+
+AFX_MSGMAP_ENTRY
+struct AFX_MSGMAP_ENTRY
+{
+	UINT nMessage;   // windows message
+	UINT nCode;  // control code or WM_NOTIFY code
+	UINT nID;    // control ID (or 0 for windows messages)
+	UINT nLastID;    // used for entries specifying a range of control id's
+	UINT nSig;   // signature type (action) or pointer to message #
+	AFX_PMSG pfn;    // routine to call (or special value)
+};
+和AFX_MSGMAP
+struct AFX_MSGMAP
+{
+#ifdef _AFXDLL
+	const AFX_MSGMAP* (PASCAL* pfnGetBaseMap)();
+#else
+	const AFX_MSGMAP* pBaseMap;
+#endif
+	const AFX_MSGMAP_ENTRY* lpEntries;
+};
+
+   其中AFX_MSGMAP_ENTRY结构包含了一个消息的所有相关信息,其中
+
+nMessage为Windows消息的ID号
+nCode为控制消息的通知码
+nID为Windows控制消息的ID
+nLastID表示如果是一个指定范围的消息被映射的话，
+nLastID用来表示它的范围。
+nSig表示消息的动作标识
+AFX_PMSG pfn 它实际上是一个指向和该消息相应的执行函数的指针。
+
+
+
+---- 而AFX_MSGMAP主要作用是两个，一：用来得到基类的消息映射入口地址。二：得到本身的消息映射入口地址。
+
+
+---- 实际上，MFC把所有的消息一条条填入到AFX_MSGMAP_ENTRY结构中去，形成一个数组，该数组存放了所有的消息和与它们相关的参数。同时通过AFX_MSGMAP能得到该数组的首地址，同时得到基类的消息映射入口地址，这是为了当本身对该消息不响应的时候，就调用其基类的消息响应。
+
+
+---- 现在我们来分析MFC是如何让窗口过程来处理消息的，实际上所有MFC的窗口类都通过钩子函数_AfxCbtFilterHook截获消息，并且在钩子函数_AfxCbtFilterHook中把窗口过程设定为AfxWndProc。原来的窗口过程保存在成员变量m_pfnSuper中。
+
+
+---- 所以在MFC框架下，一般一个消息的处理过程是这样的。
+
+
+
+
+函数AfxWndProc接收Windows操作系统发送的消息。 
+
+
+函数AfxWndProc调用函数AfxCallWndProc进行消息处理，这里一个进步是把对句柄的操作转换成对CWnd对象的操作。 
+
+
+函数AfxCallWndProc调用CWnd类的方法WindowProc进行消息处理。注意AfxWndProc和AfxCallWndProc都是AFX的API函数。而WindowProc已经是CWnd的一个方法。所以可以注意到在WindowProc中已经没有关于句柄或者是CWnd的参数了。 
+
+
+方法WindowProc调用方法OnWndMsg进行正式的消息处理，即把消息派送到相关的方法中去处理。消息是如何派送的呢？实际上在CWnd类中都保存了一个AFX_MSGMAP的结构，而在AFX_MSGMAP结构中保存有所有我们用ClassWizard生成的消息的数组的入口，我们把传给OnWndMsg的message和数组中的所有的message进行比较，找到匹配的那一个消息。实际上系统是通过函数AfxFindMessageEntry来实现的。找到了那个message，实际上我们就得到一个AFX_MSGMAP_ENTRY结构，而我们在上面已经提到AFX_MSGMAP_ENTRY保存了和该消息相关的所有信息，其中主要的是消息的动作标识和跟消息相关的执行函数。然后我们就可以根据消息的动作标识调用相关的执行函数，而这个执行函数实际上就是通过ClassWizard在类实现中定义的一个方法。这样就把消息的处理转化到类中的一个方法的实现上。举一个简单的例子，比如在View中对WM_LButtonDown消息的处理就转化成对如下一个方法的操作。 
+   void CInheritView::OnLButtonDown(UINT nFlags, CPoint point)
+   {
+        // TODO: Add your message handler code here and/or call default
+	CView::OnLButtonDown(nFlags, point);
+   }
+
+
+注意这里CView::OnLButtonDown(nFlags, point)实际上就是调用CWnd的Default()方法。 而Default()方法所做的工作就是调用DefWindowProc对消息进行处理。这实际上是调用原来的窗口过程进行缺省的消息 

@@ -1,0 +1,47 @@
+定时相关：
+1.GetTickCount()/(Windows)
+GetTickCount返回(retrieve)从操作系统启动到现在所经过的毫秒数，直到(up to)49.7天。
+它的返回值是DWORD。GetTickCount函数的原型为
+    DWORD WINAPI GetTickCount(void);
+它在winbase.h中定义。
+一天的毫秒数mmsEachDay = 24*60*60*1000=86,400,000ms，DWORD能表示的最大值为2^32=4,294,967,695，而4,294,967,695/86,400,000 = 49.71，所以若系统持续运行（run continuously）49.71天，这个数会溢出绕回到零。可以使用GetTickCount()来大概确定一段代码执行了多少时间，例程如下：
+＃include <windows.h>
+＃include <stdio.h>
+//……
+DWORD dwStart;
+DWORD dwEnd;
+dwStart = GetTickCount();
+printf( "dwStart:%d\n", dwStart );
+//YOUR CODE TO BE TIMED;
+dwEnd = GetTickCount();
+printf( "dwEnd:%d\n", dwEnd );
+printf( "elapsed:%d\n", dwEnd – dwStart )
+
+也可以用GetTickCount函数来进行定时，比如若要定时1s，可以使用如下代码：
+＃include <windows.h>
+＃include <stdio.h>
+void main() 
+{
+     DWORD dwLast;
+     DWORD dwCurrent;
+     DWORD dwInterval = 1000;
+ 
+     dwLast = GetTickCount();
+     int i = 0;
+     while(true)
+     {
+         dwCurrent = GetTickCount();
+         if( dwCurrent - dwLast < dwInterval )
+              continue;
+         //your code to be executed when interval is elapsed
+         printf("dwLast,dwCurrent,diff:%d,%d,%d\n",dwLast,dwCurrent,dwCurrent-dwLast);
+         //your code to determine when to break
+         if( i > 10 ) break;
+         i++;
+         dwLast = dwCurrent;
+     }
+     getchar();   
+     return;
+} 
+
+

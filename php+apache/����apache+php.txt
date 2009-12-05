@@ -1,0 +1,90 @@
+　二 安装程序
+
+　　1、Apache的程序安装相对来说要较为的简单一些,我们从网站下来的是一个Windows下的安装程序,我们可以直接双击运行,这样我们就便利Apache在我们的电脑上安下家来了。
+
+　　2、我们在这里要注意的就是在下载PHP时一定要下载那个zip包的,而不要下载Installer的.将我们下载下来的PHP包解压到C盘下的根目录下,并将解压出来的文件夹改名为php。
+
+　　三 配置
+
+　　1、最好是无论使用何种接口（CGI 或者 SAPI）都确保 php5ts.dll 可用，因此必须将此文件放到 Windows 路径中。最好的位置是 Windows 的 system 目录： 
+
+c:\windows\system for Windows 9x/ME 
+c:\winnt\system32 for Windows NT/2000 或者 c:\winnt40\system32 for Windows NT/2000 服务器版 
+c:\windows\system32 for Windows XP  
+
+　　2、下一步是设定有效的 PHP 配置文件，php.ini。压缩包中包括两个 ini 文件，php.ini-dist 和 php.ini-recommended。建议使用 php.ini-recommended，因为此文件对默认设置作了性能和安全上的优化。
+
+　　将选择的 ini 文件拷贝到 PHP 能够找到的目录下并改名为 php.ini。PHP 默认在 Windows 目录下搜索 php.ini： 
+
+　　3 在 Windows 9x/ME/XP 下将选择的 ini 文件拷贝到 %WINDIR%，通常为 c:\windows。 
+
+　　在 Windows NT/2000 下将选择的 ini 文件拷贝到 %WINDIR% 或 %SYSTEMROOT% 下，通常为 c:\winnt 或 c:\winnt40 对应于服务器版本。 
+
+　　4 Apache中PHP的设置
+
+　　有两种方法使得 PHP 工作在 Windows 下的 Apache。一是使用 CGI 二进制文件，另一是使用 Apache 模块 DLL。无论那种方法，您首先必须停止 Apache 服务器，然后编辑 httpd.conf，以配置 Apache 和 PHP 协同工作。 
+
+　　如果我们要使用CGI二进制文件,那么我们要将如下指令插入到 Apache 的 httpd.conf 配置文件中，以设置 CGI 二进制文件：
+
+　　PHP 以 CGI 方式安装到 Apache 2.0:
+
+ScriptAlias /php/ "c:/php/"
+AddType application/x-httpd-php .php
+Action application/x-httpd-php "/php/php.exe" 
+
+　　如果我们想把 PHP 作为 Apache 2.0 的模块，那么就一定要移动 php4ts.dll 到 winnt/system32（Windows NT/2000）或 windows/system32（Windows XP），覆盖原有文件（如果有的话），对于 PHP 5，这个文件是 php5ts.dll。然后我们要插入如下两行到 httpd.conf 中，以使我们的 PHP 作为 Apache 的 PHP-Module 安装：
+
+　　PHP 以模块方式安装到 Apache 2.0:
+
+; For PHP 4 do something like this:
+LoadModule php4_module "c:/php4/php4apache2.dll"
+AddType application/x-httpd-php .php
+
+; For PHP 5 do something like this:
+LoadModule php5_module "c:/php5/php5apache2.dll"
+AddType application/x-httpd-php .php 
+
+　　经过这样的配置以后,我们就安装好了我们的PHP和Apache服务器了。我们可以简单的测试一下:
+
+　　1、测试Apache:
+
+　　我们打开浏览器,在地址栏中输入localhost,如果可以出现Apache页面,则说明我们的Apache可以正常工作了。
+
+　　2、测试PHP设置:
+
+　　我们可以简单的编写一个PHP页面,我们可以用文本编辑器,输入下面的代码:
+
+<html>
+<head>
+<title>
+hello
+</title>
+</head>
+<body>
+<?php echo "hello,php"; ?>
+</body>
+</html> 
+
+　　然后将这个文件存为hello.php,将其放在Apache的htdocs目录中(我们也可以在http.conf文件中来更改这个目录的),然后在我们的浏览器中输入http://localhost/hello.php,如果能够正确的显示hello,php就说明我们的PHP配置是可以正常工作的。
+
+
+配置Apache的DocumentRoot：
+
+将原始配置文件中的
+DocumentRoot "C:/Apache2/htdocs"
+改为
+DocumentRoot "e:/wwwroot"
+
+相应的要修改权限设定：
+将
+<Directory "C:/Apache2/htdocs">
+改为
+<Directory "e:/wwwroot">
+
+
+配置Apache的目录索引文档
+将
+DirectoryIndex index.html index.html.var
+改为
+DirectoryIndex index.php index.html
+

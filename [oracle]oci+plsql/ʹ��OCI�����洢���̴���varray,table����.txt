@@ -1,0 +1,243 @@
+使用OCI如何向存储过程传递varray/table参数？
+Here (http://download-uk.oracle.com/docs/cd/B14117_01/appdev.101/b10779/oci11oty.htm#421737) is the documentation for OCI (never used it), and for OCCI you have two ways :
+
+- setDataBufferArray (http://download-uk.oracle.com/docs/cd/B14117_01/appdev.101/b10778/reference028.htm#sthref1634)
+- setVector (http://download-uk.oracle.com/docs/cd/B14117_01/appdev.101/b10778/reference028.htm#sthref1658)
+
+For OCI programming I won't be of much help to you unfortunately :( but for OCCI programming feel free to ask ;).
+
+===================================================================
+The SQL / PLSQL part :
+CREATE SEQUENCE SEQ_TESTTABLE MAXVALUE 9999999999 CYCLE START WITH 1 INCREMENT BY 1 CACHE 20;
+
+CREATE TABLE Test_Table(
+Id NUMBER(10),
+Description VARCHAR2(300),
+CONSTRAINT TestTable_PK PRIMARY KEY(Id));
+
+CREATE OR REPLACE PACKAGE PKG_BULK_INSERT AS
+
+TYPE VARCHAR2_I_TABLE IS TABLE OF VARCHAR2(300) INDEX BY BINARY_INTEGER;
+
+PROCEDURE BULK_INSERT_TEST(
+strTable IN VARCHAR2_I_TABLE);
+
+END PKG_BULK_INSERT;
+/
+CREATE OR REPLACE PACKAGE BODY PKG_BULK_INSERT AS
+
+PROCEDURE BULK_INSERT_TEST(
+strTable IN VARCHAR2_I_TABLE) AS
+
+i BINARY_INTEGER;
+
+BEGIN
+
+FORALL i IN 1..strTable.COUNT
+INSERT INTO Test_Table(
+Id,
+Description)
+VALUES(
+SEQ_TESTTABLE.NEXTVAL,
+strTable(i));
+
+END BULK_INSERT_TEST;
+
+END PKG_BULK_INSERT;
+/
+
+And the OCCI part with setDataBuffer which performs a 100 rows bulk insert :
+#include <occi.h>
+#include <unistd.h> // For the "sleep" command
+
+using namespace oracle::occi;
+
+#define MAX_LINES 100
+
+char GcUser[30]; // DB user
+char GcPwd[30]; // DB user's password
+char GcDBName[30]; // DB connection name present in the tnsnames.ora file
+
+Environment* Genv; // OCCI environment
+Connection* Gcon; // OCCI connection
+
+Statement* GstmtBulkInsertTest; // OCCI statement
+// The variables for the array
+char GcDescriptions[MAX_LINES][300]; // Array of Values
+ub2 Gub2Descriptions_Size[MAX_LINES]; // Array of Lengthes
+sb2 Gsb2Descriptions_Null[MAX_LINES]; // Array of NULL indicators : -1 if NULL
+ub4 Gub4MaxLines = MAX_LINES; // Max number of lines in the Array
+ub4 Gub4CurrentLines = 0; // Current number of lines, must be <= Gub4MaxLines
+
+/*
+Function that creates the statement object.
+*/
+int fctInitStatements()
+{
+try
+{
+GstmtBulkInsertTest = Gcon->createStatement();
+GstmtBulkInsertTest->setAutoCommit(FALSE);
+GstmtBulkInsertTest->setSQL("BEGIN RBARAER.PKG_BULK_INSERT.BULK_INSERT_TEST(:1); END;"); 
+
+GstmtBulkInsertTest->setDataBufferArray(1, GcDescriptions, OCCI_SQLT_STR, MAX_LINES, &Gub4CurrentLines, 300, Gub2Descriptions_Size, Gsb2Descriptions_Null);
+}
+catch (SQLException &e)
+{ 
+printf("Statement Creation Error : %s\n", e.getMessage().c_str());
+return -1;
+} 
+return 1;
+}
+
+/*
+Function that connects to Oracle.
+*/
+int fctCreateOracleConnection()
+{ 
+try
+{
+Genv = Environment::createEnvironment(Environment::DEFAUL T);
+Gcon = Genv->createConnection (GcUser, GcPwd, GcDBName);
+while (fctInitStatements() < 0)
+{
+sleep(3);
+}
+}
+catch (SQLException &e)
+{ 
+printf("Oracle Connect Error : %s\n", e.getMessage().c_str());
+return -1;
+} 
+
+return 1;
+}
+
+/*
+Function that loops in order to reconnect to Oracle.
+*/
+void fctReconnectToOracle()
+{ 
+printf("Disconnected from Oracle");
+
+while (fctCreateOracleConnection() < 0)
+{
+sleep(3);
+}
+
+printf("Reconnected to Oracle");
+}
+
+/*
+Function that performs the bulk insert.
+*/
+int fctBulkInsert()
+{
+try
+{
+GstmtBulkInsertTest->executeUpdate();
+Gcon->commit();
+}
+catch (SQLException &e)
+{ 
+if((e.getErrorCode() == 1012) || (e.getErrorCode() == 3113) || (e.getErrorCode() == 3114))
+{
+// Disconnected from Oracle
+fctReconnectToOracle();
+return -1;
+}
+
+printf("Oracle Insert Error : %s\n", e.getMessage().c_str());
+return -2;
+} 
+
+return 1;
+}
+
+/*
+Function that frees the OCCI resources.
+*/
+int fctFreeOcci()
+{
+
+try
+{
+Gcon->terminateStatement(GstmtBulkInsertTest);
+Genv->terminateConnection(Gcon);
+Genv->terminateEnvironment(Genv);
+}
+catch(SQLException e)
+{
+printf("Error while freeing resources : %s", e.getMessage().c_str());
+return -1;
+}
+
+return 1;
+} 
+
+/*
+The main function.
+*/
+int main (int argc, char** argv)
+{
+int i = 0;
+int iTmp = 0;
+
+if (argc != 4)
+{
+printf("use : test_bulk_insert username userpwd dbconnection\n");
+return -1;
+}
+
+memcpy(GcUser, argv[1], strlen(argv[1]));
+memcpy(GcPwd, argv[2], strlen(argv[2]));
+memcpy(GcDBName, argv[3], strlen(argv[3]));
+
+// Connect to Oracle
+if (fctCreateOracleConnection() < 0)
+{
+printf("Program exited\n");
+return -1;
+}
+
+Gub4CurrentLines = 0;
+
+// Fill the array in
+for (i=0; i<MAX_LINES; i++)
+{
+if (i%10 == 0)
+{
+Gsb2Descriptions_Null[i] = -1; // These will be NULL
+}
+else
+{
+sprintf(GcDescriptions[i], "Insert number %d", i+1);
+Gub2Descriptions_Size[i] = strlen(GcDescriptions[i]) + 1;
+Gsb2Descriptions_Null[i] = 0;
+}
+Gub4CurrentLines++;
+}
+
+// The insert
+iTmp = fctBulkInsert();
+
+while (iTmp == -1) // While insert fails due to a connection failure, loop
+{
+iTmp = fctBulkInsert();
+}
+
+if (iTmp < 0)
+{
+printf("Insert failed\n");
+}
+else
+{
+printf("Insert succeeded\n");
+}
+
+fctFreeOcci();
+
+return 1;
+}
+
+I've tested it and this code works, though of course it must not be bug free :). setDateBuffer does not work with SQL Nested Tables or VARRAYS, it seems only to work with PLSQL Index-By Tables (which I used here). I know the setVector() method works with Nested Tables but I've never used it (a colleague of mine did) and I don't have time to look further into this for now, so I let this up to you ;).

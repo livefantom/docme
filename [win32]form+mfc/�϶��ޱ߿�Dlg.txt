@@ -1,0 +1,48 @@
+BOOL CYourClassDlg::PreTranslateMessage(MSG* pMsg) 
+{
+     //The code starts here
+     static bool mouse_down = false;
+     static CRect MainRect;
+     static HCURSOR cursor; // use this if you want the 
+       // ¡°dragging¡± cursor different from the normal one
+     static CPoint point;
+     switch(pMsg->message)
+     {
+     case WM_LBUTTONDOWN:
+         //save current dialog¡¯s rectangle
+         GetWindowRect(&MainRect);
+         //save current cursor coordinate
+         point = pMsg->pt;
+         ScreenToClient(&point);
+         
+         //change the sign
+         mouse_down = true;
+         cursor = ::AfxGetApp()->LoadCursor(IDC_CURSOR1);
+         break;
+     case WM_LBUTTONUP:
+         //stop the sign
+         mouse_down = false;
+         //gimme a standard cursor now!!
+         cursor = ::AfxGetApp()->LoadStandardCursor(IDC_ARROW);
+         break;
+     case WM_MOUSEMOVE :
+         cursor = ::AfxGetApp()->LoadStandardCursor(IDC_ARROW);
+         if(mouse_down)
+         {     
+              //if here, then the mouse is dragging
+              cursor = ::AfxGetApp()->LoadCursor(IDC_CURSOR1);
+              //finally, move the window
+              MoveWindow(    pMsg->pt.x - point.x,
+                  //count the relative position
+                       pMsg->pt.y - point.y,
+                       MainRect.Width(), 
+                     //if the width doesn¡¯t change 
+                       MainRect.Height(),
+                     //if the height doesn¡¯t change
+                       TRUE);
+         }
+     }
+     SetCursor(cursor);
+     //The code ends here
+     return CDialog::PreTranslateMessage(pMsg);
+}

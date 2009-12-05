@@ -1,0 +1,4 @@
+apache+php+oracle配置注意事项：
+1）ORACLE_HOME环境变量放在执行apache用户的shell中，并执行，重启apache。
+2）apache的运行用户要拥有对ORACLE_HOME的执行权限。
+3）shell中要同时设置NLS_LANG, 和NLS_TIME_FORMAT环境变量。

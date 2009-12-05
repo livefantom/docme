@@ -1,0 +1,290 @@
+利用Win32的网络函数创建一个网络浏览器
+ 
+2003-4-25 12:44:30   VCTOP   Dale Rogerson   阅读次数: 38734 
+摘要
+
+这篇技术性文章讨论了如何利用Microsoft Win32网络函数创建一个网络浏览器。这篇文章的宗旨是让读者了解一些Win32网络函数的作用、能力和使用范围，而不是为这些功能给出一个详细的文档。这篇文章所配合的SurfBear样本应用程序使用Win32网络函数从网络服务器上读取HTML文件，并把它们显示成原始的、没有经过格式化的文本。
+
+　
+
+介绍
+
+不通过网络，你就无法了解我的一个朋友。计算机杂志已经在internet上设置了电子期刊，而本地的报纸也已经把整个段落都放到了网络上。事实上，许多报纸都在联机。每个人都有一个主页，甚至一些无家可归的人都有一个主页。虽然有许多关于网络的消息难免言过其实，但网络正在变成计算机整体的一部分已经是无庸置疑的了。 
+
+Microsoft 已经介绍了Microsoft Win32网络函数来协助开发者把网络变成他们的应用程序的整体部分。这些新的功能简化了使用FTP（文件传输协议）、和HTTP（超文本传输协议）访问网络。使用Win32网络函数的开发者不需要对TCP/IP或Windows 配件。对于一些最普通的操作，开发者不需要知道他们正在使用的某个协议的细节。
+
+最终，Win32网络函数将成为Win32应用程序接口的一部分并且与基于Windows的不同的平台一起发布。最初，Win32网络函数将安装在一个叫做WININET.DLL的再分布式动态链接库里。（来自Microsoft网络软件开发工具包，其网址是:http://www.microsoft.com/inter/sdle/）。这属于网络开发工具包的一部分。
+
+这篇文章说明了如何使用Win32网络函数去创建一个简单的网络浏览器。它没有具体详细的讨论这些功能的细节，但对他们的用法和操作给出了一个演示。请参考网址是http://www.microsoft.com/intdev/sdk/docs/wininet的Microsoft Win32网络函数的主题，可以了解到全部的细节。
+
+这篇文章是配合SurfBear样本应用程序而创作的。SurfBear是一个HTML文件。覆盖了这个过程种特定的网络部分，但它没有涉及与这个过程有关的用户接口问题或HTML文件的显示或操作问题。
+
+注意：这篇文章是基于WININET.DLL一个相当早的版本。很可能其中的参数名、标识名和函数名发生了改变。但是函数的范围和意图应该还是和这篇文章中描述的是一致的。
+
+　
+
+网络函数
+
+最好的探讨Win32网络函数的方法是直接进入代码。下面的代码是样本的代码，为了方便阅读，错误处理部分已经被删除掉了。
+
+HINTERNET hNet = ::InternetOpen("MSDN SurfBear",
+                                PRE_CONFIG_INTERNET_ACCESS,
+                                NULL,
+                                INTERNET_INVALID_PORT_NUMBER,
+                                0) ;
+
+HINTERNET hUrlFile = ::InternetOpenUrl(hNet,
+                                "http://www.microsoft.com",
+                                NULL,
+                                0,
+                                INTERNET_FLAG_RELOAD,
+                                0) ;
+
+char buffer[10*1024] ;
+DWORD dwBytesRead = 0;
+BOOL bRead = ::InternetReadFile(hUrlFile,
+                                buffer,
+                                sizeof(buffer),
+                                &dwBytesRead);
+
+::InternetCloseHandle(hUrlFile) ;
+
+::InternetCloseHandle(hNet) ;
+上面列举的代码包括四个网络函数：InternetOpen、InternetOpenOrl、InternetReadFile和InternetCloseHandle。下面我们依次对这些函数进行分析。
+
+InternetOpen
+
+InternetOpen初始化WININET.DLL。它在其他的Win32网络函数之前被调用。
+
+HINTERNET hNet = ::InternetOpen(
+          "MSDN SurfBear",              // 1 LPCTSTR lpszCallerName
+          PRE_CONFIG_INTERNET_ACCESS,   // 2 DWORD dwAccessType
+          "",                           // 3 LPCTSTR lpszProxyName
+          INTERNET_INVALID_PORT_NUMBER, // 4 INTERNET_PORT nProxyPort
+          0                             // 5 DWORD dwFlags
+) ;
+InternetOpen返回一个类型为HINTERNET的句柄。其他的Win32网络函数把这个句柄当作一个参数。现在你不能把一个HINTERNET句柄用在类似于ReadFile之类的其他Win32函数中。但是随着Microsoft Windows和Microsoft Windows NT网络支持的成熟，这一点在将来不是不可能实现的。
+
+当你已经结束使用Wein32网络函数时，你应该调用InternetCloseHandle释放InternetOpen分配的资源。使用Microsoft基础类（MFC）的应用程序将从文件的构造程序里象征性地调用InternetOpen。绝大多数应用程序都将在每一进程里调用InternetOpen。 
+
+InternetOpen 的第一个参数lpszCallerName指定正在使用网络函数的应用程序。当HTTP协议使用时，这个名字将变成用户代理。
+
+第二个参数dwAccessType指定访问类型。在上面的例子里，PRE_CONFIG_INTERNET_ACCESS访问类型指示Win32网络函数使用登记信息去发现一个服务器。使用PRE_CONFIG_INTERNET_ACCESS需要正确设定登记信息。这里我耍了一个小花招并让网络开发者替我登记注册。如果你不想欺骗，你需要按图1所示设定登记信息。
+
+　
+
+　
+
+　
+
+　
+
+在登记注册中，把AccessType设置为1，则意味着“直接入网”，把AccessType 设置为2，意味着“使用网关”。把DisableServiceLocation设置为1，将让它使用一个已经命名的服务器；否则将找到一个使用注册信息和名字决议（RNR）应用程序接口的服务器，它是Windows接口的一部分。 
+
+其他的访问类型包括以下几种： 
+
+LOCAL_INTERNET_ACCESS只连接到当地Internet网站。例如，如果我使用SurfBear标志，我就只能访问Microsoft整体的Internet网站。 
+CERN_PROXY_INTERNET_ACCESS使用一个CERN代理去访问web。CERN代理是一个充当网关的web服务器并且能向要使用代理的服务器发送HTTP请求。 
+GATEWAY_INTERNET_ACCESS允许连接到World Wide Web。我可以用这个访问类型去访问web上的任何站点。 
+GATEWAY_PROXY_INTERNET_ACCESS和CERN_PROXY_ACCESS访问类型要求第三个参数给InternetOpen：服务器名（lpszProxyName）。PRE_CONFIG_INTERNET_ACCESS不要求服务器名，因为他可以为服务器搜索寄存信息。 
+
+NProxyPort参数用在CERN_PROXY_INTERNET_ACCESS中用来指定使用的端口数。使用INTERNET_INVALID_PORT_NUMBER相当于提供却省的端口数。
+
+最后一个参数棗dwFlags，设置额外的选择。你可以使用 INTERNET_FLAG_ASYNC标志去指示使用返回句句柄的将来的Internet函数将为回调函数发送状态信息，使用InternetSetStatusCallback进行此项设置。
+
+　
+
+InternetOpenUrl
+
+一旦你把Win32网络函数初始化了，你就可以使用其他网络函数。下一个要调用的Internet 函数是InternetOpenUrl。这个函数连接到一个网络服务器上并且最被从服务器上读取数据。InternetOpenUrl能对FTP，Gopher或HTTP协议起作用。在这篇文章中，我们只涉及HTTP协议。
+
+HINTERNET hUrlFile = ::InternetOpenUrl(
+          hNet,                       // 1 HINTERNET hInternetSession
+          "http://www.microsoft.com", // 2 LPCTSTR lpszUrl
+          NULL,                       // 3 LPCTSTR lpszHeaders
+          0,                          // 4 DWORD dwHeadersLength
+          INTERNET_FLAG_RELOAD,       // 5 DWORD dwFlags
+          0                           // 6 DWORD dwContext
+) ;
+InternetOpenUrl也返回一个HINTERNET，它被传递给在这个URL（统一资源定位）上操作的函数。你应该使用InternetClose来关闭这个句柄的处理。 
+
+InternetOpenUrl的第一个参数hInternetSession是从InternetOpen返回的句柄。第二个参数lpszUrl是我们需要的资源的URL（统一资源定位）。在上面的例子中，我们想得到一个Microsoft的web主页。下面两个参数lpszHeaders和HeaderLength用来向服务器传送额外的信息。使用这些参数要求具有正在使用的特定协议的知识。 
+
+DwFlag是一个可以用几种方式修改InternetOpenUrl行为的标志，InternetOpenUrl的行为包括关闭、隐藏，使原始数据可用和用存在的连接取代开辟一个新的连接。
+
+最后一个参数dwContext是一个 DWORD上下文值。如果有一个值已经被指定，它将被送到状态回调函数。如果这个值是0，信息将不会被送到状态回调函数。 
+
+　
+
+InternetReadFile
+
+你打开一个文件后，就要读它，所以下一个函数是InternetReadFile是符合逻辑的：
+
+char buffer[10*1024] ;
+DWORD dwBytesRead = 0;
+BOOL bRead = ::InternetReadFile(
+     hUrlFile,                 // 1 HINTERNET hFile
+     buffer,                   // 2 LPVOID lpBuffer
+     sizeof(buffer),           // 3 DWORD dwNumberOfBytesToRead
+     &dwBytesRead              // 4 LPDWORD lpdwNumberOfBytesRead
+);
+
+buffer[dwBytesRead] = 0 ;
+pEditCtrl->SetWindowText(buffer) ;
+InternetReadFile接收InternetOpenUrl返回的句柄。它也对其他Win32网络函数，例如FtpOpenFile,FopherOpenFile和HttpOpenRequest返回的句柄有影响。
+
+剩下的InternetReadFile的三个参数也非常的明白直接。Inbuffer是指向保留数据的缓冲区的一个无返回值指针，dwNumberOfByteToRead以字节为单位指定缓冲区的尺寸。最后一个参数，lpdwNumberOfBytesRead是一个指向包含读入缓冲区字节数的变量的指针。如果返回值是TRUE，而且lpdwNumberOfBytesRead指向0，则文件已经读到了文件的末尾。这个行为与Win32 Re3adFile的函数的行为是一致的。一个真正的web浏览器将在InternetReadFile上循环 ，不停地从Internet上读入数据块。
+
+为了显示缓冲区，向缓冲区添加一个0并把它送到编辑器控制。
+
+这样，InternetOpen、InternetOpenUrl和InternetReadFile一起创建了Internet浏览器的基础。他们使从Internet上读取文件就象从你的本地硬盘驱动器上读取文件一样容易。 
+
+　
+
+HTTP函数
+
+在一些例子中，InternetOpenUrl太普通了，所以你可能需要其他的Win32网络函数。InternetOpenUrl相当与不同的FTP，GOPHER和HTTP函数的封皮。当使用HTTP时，InternetOpenUrl调用InternetConnect，HttpOpenRequest以及HttpSendRequest，比如说我们想要在下载一个HTML页之前得到它的尺寸以便于我们在缓冲区中为其分配适当的尺寸，HttpQueryInfo将得到web页的大小。
+
+警告：不是所有web 页都支持得到页尺寸。（例如：www.toystory.com和www.movielink.com不支持这个功能）另外，TCP/IP能传递的数据也比要求的要少。所以，你的应用程序应该处理着两种情况并且围绕InternetReadFile循环直到结果为TRUE同时*lpdwNumberOfBytesRead为0。
+
+使用HttpOpenRequest，HttpSendRequest和HttpQueryInfo去打开文件http://www.microsoft.com/msdn/msdninfo的代码显示如下，错误检测已经被删除。
+
+// Open Internet session.
+HINTERNET hSession = ::InternetOpen("MSDN SurfBear",
+                                    PRE_CONFIG_INTERNET_ACCESS,
+                                    NULL, 
+                                    INTERNET_INVALID_PORT_NUMBER,
+                                    0) ;
+
+// Connect to www.microsoft.com.
+HINTERNET hConnect = ::InternetConnect(hSession,
+                                    "www.microsoft.com",
+                                    INTERNET_INVALID_PORT_NUMBER,
+                                    "",
+                                    "",
+                                    INTERNET_SERVICE_HTTP,
+                                    0,
+                                    0) ;
+
+// Request the file /MSDN/MSDNINFO/ from the server.
+HINTERNET hHttpFile = ::HttpOpenRequest(hConnect,
+                                     "GET",
+                                     "/MSDN/MSDNINFO/",
+                                     HTTP_VERSION,
+                                     NULL,
+                                     0,
+                                     INTERNET_FLAG_DONT_CACHE,
+                                     0) ;
+
+// Send the request.
+BOOL bSendRequest = ::HttpSendRequest(hHttpFile, NULL, 0, 0, 0);
+
+// Get the length of the file.            
+char bufQuery[32] ;
+DWORD dwLengthBufQuery = sizeof(bufQuery);
+BOOL bQuery = ::HttpQueryInfo(hHttpFile,
+                              HTTP_QUERY_CONTENT_LENGTH, 
+                              bufQuery, 
+                              &dwLengthBufQuery) ;
+
+// Convert length from ASCII string to a DWORD.
+DWORD dwFileSize = (DWORD)atol(bufQuery) ;
+
+// Allocate a buffer for the file.   
+char* buffer = new char[dwFileSize+1] ;
+
+// Read the file into the buffer. 
+DWORD dwBytesRead ;
+BOOL bRead = ::InternetReadFile(hHttpFile,
+                                buffer,
+                                dwFileSize+1, 
+                                &dwBytesRead);
+// Put a zero on the end of the buffer.
+buffer[dwBytesRead] = 0 ;
+
+// Close all of the Internet handles.
+::InternetCloseHandle(hHttpFile); 
+::InternetCloseHandle(hConnect) ;
+::InternetCloseHandle(hSession) ;
+
+// Display the file in an edit control.
+pEditCtrl->SetWindowText(buffer) ;
+
+InternetConnect
+    InternetConnet函数连接到一个HTTP，FTP或Gopher服务器：
+HINTERNET hConnect = ::InternetConnect(
+          hSession,                     //1 HINTERNET hInternetSession
+          "www.microsoft.com",          //2 LPCTSTR lpszServerName
+          INTERNET_INVALID_PORT_NUMBER, //3 INTERNET_PORT nServerPort
+          "",                           //4 LPCTSTR lpszUsername
+          "",                           //5 LPCTSTR lpszPassword
+          INTERNET_SERVICE_HTTP,        //6 DWORD dwService
+          0,                            //7 DWORD dwFlags
+          O                             //8 DWORD dwContext
+) ;
+    第六个参数dwService决定服务类型（HTTP，FTP或Gopher）。在上面的例子中，InternetConnect连接到一个HTTP服务器上，因为dwService被设置成INTERNET_SERVICE_HTTP。第二个参数（设置成www.microsoft.com）提供了服务器的地址。注意，HTTP地址必须为服务器名作语法分析，InternetOpenUrl为我们作语法分析。第一个参数hInternetSession是从InternetOpen返回的句柄。第四个、第五个参数提供一个用户姓名和密码 。这七个参数没有控制任何标志影响HTTP操作。最后一个参数为状态回调函数提供前后关系的信息。
+
+HttpOpenRequest
+    一旦和服务器的连接已经建立，我们打开了想要的文件。HttpOpenRequest和HttpSenRequest一起工作打开文件。HttpOpenRequest去创建一个请求句柄并且把参数存储在句柄中。HttpOpenRequest把请求参数送到HTTP服务器。
+HINTERNET hHttpFile = ::HttpOpenRequest(
+          hConnect,              // 1 HINTERNET hHttpSession
+          "GET",                 // 2 LPCTSTR lpszVerb
+          "/MSDN/MSDNINFO/",     // 3 LPCTSTR lpszObjectName
+          HTTP_VERSION,          // 4 LPCTSTR lpszVersion
+          NULL,                    // 5 LPCTSTR lpszReferer
+          0,                     // 6 LPCTSTR FAR * lplpszAcceptTypes
+          INTERNET_FLAG_DONT_CACHE,  // 7 DWORD dwFlags
+          0                      // 8 DWORD dwContext
+) ;
+    到现在为止，网络函数的许多参数看起来都类似。HttpOpenResult的第一个参数是由InternetConnet返回的    HINTERNET。HttpOpenRequest的第七和第八个参数执行与InternetConnect中有相同名字的参数一样的功能。
+    第二个参数（“GET”）指定我们想要得到由第三个参数（“/MSDN/MSDNINFO/”）命名的对象。HTTP版已经传递第四个参数；现在，它肯定是HTTP棗VERSION。因为“GET”是最流行的动词类型，HttpOpenRequest将为这个参数接收一个空指针。
+    第五个参数lpszReferer是一个网点的地址。在这个网点上我们发现了我们现在想要看见的URL（统一资源定位）。换而言之，如果你在www.home.com上而且单击了跳到www.microsoft.com的一个连接，第五个参数就是www.home.com。因为它使你指向了目标URL（统一资源定位）。这个值可以为空。第六个参数执行一个我们的程序接收的文件类型列表。把空值传递给HttpOpenRequest即通知了服务器只有文本文件可以被接收。
+
+　
+
+HttpSendRequest
+
+除了传送请求外，HttpSendRequest允许你传送额外的HTTP标题给服务器。关于HTTP标题的信息可以在http://www.w3.org/ 上的最新的说明上找到。在这个例子中，HttpSendRequest的所有参数都被传递为缺省值。
+
+BOOL bSendRequest = ::HttpSendRequest(
+     hHttpFile, // 1 HINTERNET hHttpRequest
+     NULL,      // 2 LPCTSTR lpszHeaders
+     0,         // 3 DWORD dwHeadersLength
+     0,         // 4 LPVOID lpOptional
+     0          // 5 DWORD dwOptionalLength
+);
+HttpQueryInfo
+
+为了得到关于文件的信息，在调用HttpSendRequest后使用HttpQueryInfo函数：
+
+BOOL bQuery = ::HttpQueryInfo(
+     hHttpFile,                 // 1 HINTERNET hHttpRequest
+     HTTP_QUERY_CONTENT_LENGTH, // 2 DWORD dwInfoLevel
+     bufQuery,                  // 3 LPVOID lpvBuffer
+     &dwLengthBufQuery          // 4 LPDWORD lpdwBufferLength
+) ;
+查询的结构是字符串或lpvBuffer中的字符串列表。HTTP_QUERY_CONTENT_LENGTH查询得到文件的长度。你可以使用HttpQueryInfo查询大范围的信息。要获知详细情形可查阅网点http://www.microsoft.com/intdev/sdk/docs/wininet上的Microsoft Win32网络函数专题。
+
+SurfBear样本应用程序
+
+SurBear样本应用程序使用Win32网络函数从Internet上得到文件并且在编辑器上显示原始的HTML格式。SurfBear使用HttpOpenRequest和HttpSendRequest取代InternetOpenUrl，纯粹是为了演示的需要。
+
+　
+
+图2 SurfBear 屏幕 
+
+SurfBear是一个MFC4.0版本的对话应用程序。它所有与Internet有关的功能都在InternetThread.h和InternetThread.cpp文件中。
+
+从internet上读取文件要花费相当数量的时间，所以从一个工作线程调用网络函数是一个明智的主意。通过这种方式，当系统在等待得到数据时，应用程序的窗口能被改变尺寸和移动。
+
+图3显示了SurfBear的控制流。
+
+　
+
+当用户按下GOTO按钮时，CsurfBearDlg::OnBtnGoto调用CinternetThread:GetWebPoge,传递想要的web页的HTTP地址。GetWebPage把HTTP地址语法分析成服务器和对象名，存储在CinternetThread的成员变量中。GetWebPage然后调用AfxBeginThread，它产生一个运行静态成员函数的线程GetWebPage WorkerThread。如果网络函数没有被初始化，GetWebPageWorkerThread调用InternetOpen，然后它尝试读取想要的web页。当GetWebPageWorkerThread结束时，它发送一个用户定义的WM_READFILECOMPLETED消息给SurfBear对话框。OnReadFileCompleted处理这个消息并且把一个web页复制到编辑器控制里。
+
+总结
+
+Win32网络函数使从FTP，Gopher和HTTP服务器上读取信息就想从你的硬盘驱动器上读取信息一样容易。仅仅使用4个函数棗InternetOpen,InternetOpenUrl,InternetReadFile和InternetCloseHandle和很少的HTTP知识，你就可以写一个简单的网络浏览器。
+
+把这个简单的浏览器变成一个工业性质的浏览器将要花费很多工作，包括 一些对HTTP的了解，对如何显示HTML文件的了解和以及使用多线程方式的能力。Win32网络函数将开发者从与TCP/IP，Windows Sockets和HTTP编程有关的大多数烦闷工作中解脱出来 

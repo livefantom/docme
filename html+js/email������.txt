@@ -1,0 +1,29 @@
+HTML页面中，可以建立E-mail链接。当浏览者单击链接后，系统会启动默认的本地邮件服务系统发送邮件。 
+    基本语法：<a href="mailto:E-mali 地址: subject=邮件主题">描述文字</a>
+
+   在实际应用中，用户还可以加入另外的两个参数"?cc="E-mali地址"和"&body=?",这分别表示在发送邮件的同时把邮件抄送给第三者和设定邮件主题内容。
+
+邮件的参数 参   数 描   述 
+subject 电子邮件主题 
+cc 抄送收件人 
+body 主题内容 
+bcc 暗送收件人 
+
+
+    如果希望同时写下多个参数，则参数之间使用"&"分隔符。
+
+实例：
+
+<html>
+<head>
+<title>发送邮件</title>
+</head>
+<body>
+<p> 
+<a href="mailto:zhoujr3071@yahoo.com.cn?cc=benbenmao@163.com&Subject=早安   &bcc=a@b.c
+&Body= 早安,笨笨猫祝你度过一个快乐的早晨！">  
+向笨笨猫的好友发送邮件(抄送 笨笨猫)
+</a>  
+</p>  
+</body>  
+</html> 

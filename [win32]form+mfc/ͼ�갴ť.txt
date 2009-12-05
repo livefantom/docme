@@ -1,0 +1,281 @@
+★ 5--2--1 图标按钮
+
+图标按钮可谓是按钮控件使用图像最简单的方式，除此之外图标按钮的优点还在于显示在按钮上的图标能够使用透明色，因而不必再去为处理非矩形图像在按钮颜色发生变化时边缘颜色的处理而费心。不过也正是使用图标导致了图标按钮的天生弱点。图标太小了，仅仅才 32×32 像素大小，在有的场合仅靠使用这么小的图像就有些显得力不从心了。
+
+在讲图标按钮如何使用之前，先得告诉读者句柄的概念。句柄是什么？很多教科书上都这样定义：句柄是一个用于代表对象的 32 位整型值。不过这对于很多初学者而言，并不是太好理解。其实也可以将未赋值的句柄理解为一个指向“空白”（void *）的指针，事实上也如此，在 Winnt.h 中，句柄就是如此被声明的：typedef void *HANDLE; 当句柄被赋值之后，它就成为指向某个特定位置的指针，即代表了某个特定的对象。之所以在现在提及句柄，是因为句柄是 Windows 编程中的一个关键性概念。尽管在前面除第三章外的内容中很少涉及它，不过在下面的学习中我们将会很频繁的使用到句柄。
+
+技术概要：
+使用图标按钮很简单，大的步骤仅仅就三步：
+①．从外部导入一个图标或自己创建一个图标作为资源。
+②．从资源中载入所要使用的图标。
+③．在要使用图标的按钮上设置图标。
+
+具体实现：
+■第一步导入图标没有什么特别之处，同前面 2.2 节中使用静态图像控件导入位图是非常类似的。无非就是使用 Insert 菜单上的 Resource 命令，导入或创建一个图标即可。
+
+■第二步载入图标就涉及到一些细节问题了。使用函数 LoadIcon() 载入图标。因为LoadIcon() 是类 CWinApp 的成员函数，同时函数 LoadIcon() 返回所载入图标的句柄。所以我们采用以下方法来调用函数 LoadIcon():
+  h_Icon = AfxGetApp() -> LoadIcon(IDI_Icon);
+  当然，在该语句之前还必须要有对图标句柄 h_Icon 的定义：
+            HICON h_Icon；
+
+■第三步为按钮设置图标了，这通过调用函数 SetIcon() 来实现。同时不要忘记，还须在使用图标的按钮的 Properties 设置中设置 Icon 属性，指明该按钮是一个图标按钮。因为函数 SetIcon() 为类 CButton 的成员函数，可以通过两种方法来调用该函数。一是通过 CButton 类对象来调用 SetIcon()，如下面代码：
+         m_BtonIcon.SetIcon(h_Icon);   // m_BtonIcon 为一个 CButton 类对象。 
+  二是先由函数 GetDlgItem() 获得一个指向 CWnd 对象的指针，再通过强制类型转换将该指针转换为一个指向 CButton 类对象的指针。进而通过该指针来调用函数 SetIcon()。具体实现代码如下：
+         CWnd *pWnd =  GetDlgItem(IDC_RADIO2); 
+        CButton *pBton = (CButton *) pWnd;
+         pBton -> SetIcon(h_Icon2);
+  既然有第一种较为简便的方法为按钮设置图标，为何还要提及第二种方法呢？因为并不是在任何情况下都会有 CButton 类对象的，例如对于一组单选按钮。只能为它们定义一个 CButton 类对象，如果使用该对象来调用函数 SetIcon()，则只能在设置了 Group 属性的那个单选按钮上设置图标。所以要达到在一组单选按钮中分别设置不同图标的目的，就只有使用第二种方法。
+
+    尽管在现在的 Windows 编程中，资源句柄数多得相对于我们而言几乎是无限的，但最好在使用完资源句柄后及时的把它们删除掉。上面所讲述的方法不仅适用于 Push Button，而且同样适用于 Radio Button、Check Box 和 Group Box。
+
+
+★ 5--2--2 位图按钮
+
+图标按钮虽有着种种优点，但它能显示的图像实在是太小了。在有的场合显然就不适用了。位图按钮可以在按钮表面显示一幅位图而不再是一个小小的图标。但是因为在位图中不能使用透明色，因而当显示的位图不为矩形时，就得为位图中非矩形部分的背景色动一番脑筋了。因为存在着用户改变按钮表面颜色，也就是位图背景色的可能性。可以用透明位图的技术来解决这一难题，这将在后面 5.7 实现具有透明性的位图中讲述。
+
+技术概要：
+位图按钮的使用的大致步骤同图标按钮基本相似，也是以下三个步骤：
+① 从外部导入一个位图或自己创建一个位图作为资源。
+② 从资源中载入所要使用的位图。
+③ 在要使用位图的按钮上设置位图。
+
+具体实现：
+    ■第一步从外部导入一个位图作为资源同使用图标按钮时是完全一致的，在此就不详细讲述了。
+
+    ■第二步中，利用函数 LoadBitmap() 从资源中载入位图。函数 LoadBitmap() 为一个 API 函数，定义如下：
+HBITMAP LoadBitmap( 
+HINSTANCE hInstance, // handle of application instance 
+LPCTSTR lpBitmapName // address of bitmap resource name 
+);
+所以，为达到载入位图的目的，不仅要定义一个位图句柄 hBitmap：
+             HBITMAP hBitmap;
+而且还要定义一个应用程序实例句柄 hInstance;：
+             HINSTANCE hInstance;
+并调用函数 AfxGetInstanceHandle() 以获得当前的应用程序实例句柄，代码如下：
+ hInstance = ::AfxGetInstanceHandle();
+只有在声明并获得了当前的应用程序句柄后，才能使用以下语句载入位图：
+hBitmap = ::LoadBitmap(hInstance,"BMP1");
+注意，在函数 LoadBitmap() 中的第二个参数为资源名，而非资源 ID。因为资源名是一个字符串，而资源 ID 则是一个整型量。所以在创建或导入位图后，为该位图资源命名时要加上双引号以表示这是一个资源名。如右图 5-2：
+
+■在第三步中，为要使用位图的按钮设置位图，方法与图标按钮完全相同。首先是要在使用位图的按钮的 Properties 设置中设置 Bitmap 属性，指明该按钮是一个位图按钮。然后再调用 CButton 类函数 SetBitmap() 为按钮设置位图。代码如下：
+
+  // m_BtonBmp 为一个 CButton 类对象。
+  m_BtonBmp.SetBitmap(hBitmap);
+  或
+  pWnd =  GetDlgItem(IDC_Check);
+  pBton = (CButton *) pWnd;
+  pBton -> SetBitmap(hBitmap);
+
+    同图标按钮一样，使用位图不局限于 Push Button，而且同样适用于 Radio Button、Check Box 和 Group Box。同时，最好在使用完位图句柄后及时的将它删除掉。
+
+
+★ 5--2--3 CBitmapButton 类位图按钮
+
+前面所讲述的图标及位图按钮最大的不足在于，无论当按钮控件处于何种状态，按钮上所显示的图案总是一成不变的，相比之下那些随着操作而实时改变图案的按钮就具有更加生动的效果。MFC 库为我们捉供了一个这样的类 CBitmapButton。利用这个类，我们可以为一个按钮设计四幅不同位图、分别用于正常状态、按下状态、获得输入焦点和无效时。这样，随着按钮状态的改变，位图也随之切换，这样就使按钮呈现出很强的动感效果。令人高兴的是，类 CBitmapButton 将很多操作的细节都封装了起来，因而我们能够很方便的达到上述目的。由于以上原因，CBitmapButton 类位图按钮有着比图标按钮和位图按钮更为广阔的使用范围。在一般情况下，都将 CBitmapButton 类位图按钮称作是位图按钮，而将真正的位图按钮给忽略了。
+CBitmapButton 类位图按钮的缺点同位图按钮是一致的，都是在对透明色的处理上。还有一个比较严重的问题是 CBitmapButton 类位图按钮是将位图按原始大小绘制在按钮上，而不是随按钮大小而缩放位图。这在平时不会导致任何问题，但若是在 Windows 中更改了显示字体的大小，则对话框及上面的按钮控件大小也随之改变，但位图按钮上的位图却保持原有大小不变，这样就会在外观上造成严重的问题。尽管有以上问题的存在，CBitmapButton 类位图按钮还是具有很大的实用价值，因为付出很少的代码就可以得到生动形象的图形效果。、下面就讲述 CBitmapButton 类位图按钮的使用方法（以下均简称为位图按钮）。
+绝大数情况下，使用位图按钮只需四个步骤：
+
+● 第一步：在要使用位图的按钮的 Properties 设置中设置 Owner Draw 属性
+
+● 第二步：创建或从外部导入至少一幅至多四幅位图。位图按钮所使用的位图颜色最多可达 256 色，但对于 256 色的位图不能通过剪贴的的方式来创建。而必须使用导入的方式来创建。若该按钮控件的 Caption （标题）为 BmpBton，则将这四幅位图的 ID 分别设定为 “BMPBTONU”、“BMPBTOND”、“BMPBTONF”、“BMPBTONX”分别对应于按钮的正常状态、按下状态、获得输入焦点状态和无效状态。注意，只有在正常状态显示的位图是必须的，其它状态的位图都是可选的；还有就是代表位图的 ID 都必须加上双引号并且大写（如下图 5-3）。实际上，加上双引号就表示该资源是以字符串常量来标识。
+
+
+
+
+
+● 第三步：在使用位图按钮的类的类定义文件中声明 CBitmapButton 类对象：CBitmapButton m_BtonSet;
+
+● 第四步：在对话框的 OnInitDialog() 函数中通过 CBitmapButton 类对象调用函数 AutoLoad() 自动加载位图： m_BtonSet.AutoLoad(IDC_BtonSet,this); 
+
+经过以上四个步骤，一个位图按钮就创建好了。在运行中，CBitmapButton 类会自动根据按钮的状态显示对应的位图。利用位图按钮技术，再加上一点鼠标感应技术，就很容易做出像网页按钮那样的在鼠标经过时加亮的动态效果。也能轻易的实现像 Word 中那样的平面按钮。这些将在后面的章节中讲述。
+需要说明的是，CBitmapButton 类位图按钮仅限于在 Push Button 使用。在默写情况下，我们可能需要动态创建位图按钮，在动态创建位图按钮时，不能使用函数 AutoLoad() 加载位图，而要使用函数 LoadBitmaps() 来加载位图。动态创建位图按钮主要有以下几个步骤：
+    ●第一步：为要创建的控件分配一个 ID 值。
+    ●第二步：定义一个 CBitmapButton 类对象。
+    ●第三步：由该对象调用函数 Create() 创建位图按钮，并调用函数 LoadBitmap() 加载位图。在调用函数 SizeToContent() 调整按钮控件的大小以适应位图。
+● 第四步：加入对新创建按钮的消息处理。
+
+第三步实现代码如下：
+ m_BmpBtonExit.Create("EXIT",BS_PUSHBUTTON|WS_VISIBLE|BS_OWNERDRAW,
+  rcBtonExit,this,IDOK);
+ m_BmpBtonExit.LoadBitmaps("EXITU","EXITD");
+
+
+★ 5--2--4 按钮的自绘制
+
+前面讲述的三种在按钮上显示图像的方法或多或少的存在着不足之处，图标按钮太小，位图按钮无法设置透明色，CBitmapButton 类位图按钮位图大小不能随按钮控件变化。使用按钮的自绘制技术是解决以上问题的最佳途径。当然，按钮的自绘制技术的作用不仅仅局限于按钮表面显示图像，利用它可以充分发挥自己的创造力从而创建出各式各样的按钮控件。例如动画按钮等。如果说利用按钮自绘制技术在按钮上显示图像唯一有一点不足的话，那就是实现略为复杂了一些。但利用按钮自绘制技术，在配合以 DIB 文件读取技术，就完全能够实现象 Winamp 中那样的 Skin 技术。
+
+概念解释：
+先解释一下什么叫做按钮的自绘制，准确的说应该是控件的自绘制技术。Windows 能够向控件的父窗口发送消息以让父窗口定制控件的外观和行为。MFC 则更近了一步，它能够译解自绘制参数并将消息发回控件本身。因为绘制控件的代码实在控件类中实现，而不是在拥有控件的窗口中，因而称为“自绘制”。除按钮控件可以自绘制外，列表框、组合框以及菜单都支持自绘制。 
+
+在基于对话框的应用程序框架的基础上创建一个自绘制的按钮，主要有以下步骤：
+■ 第一步：
+在对话框上放置一个按钮，并在其 Properties 中设置 Owner Draw 属性。
+■ 第二步：
+  用 ClassWizard 从 CButton 类中派生出一个新类。进入 ClassWizard，点击 Message Maps 标签下的 New 按钮，在弹出的菜单中选择 New 命令进入 New Class 对话框。在 New Class 对话框中填入新创建类的名称 CownerDrawBton，以及选择所创建类的父类为 CButton（如下图 5-4）：
+
+
+■ 第三步：
+为新创建的 COwnerDrawBton 类增加一个成员函数 DrawItem()。在 WorkSpace 窗口中的 Class View 标签下，右键单击类 COwnerDrawBton，在随后的菜单中选择 Add Virtual Funtion…命令（如左下图 5-5）进入 New Virtual Override for class COwnerDrawBton 对话框（如右下图 5-6），在该对话框的 New Virtual Function 栏中选择函数 DrawItem，再点击 Add and Edit 按钮就超越了函数 DrawItem，并进入其内部处于待编辑状态。
+
+
+概念解释：
+函数 DrawItem()：该函数在当自绘制按钮的外观需要重绘时调用。其定义如下：
+           virtual void DrawItem( LPDRAWITEMSTRUCT lpDrawItemStruct ); 
+参数 lpDrawItemStruct 为指向结构 DRAWITEMSTRUCT 的一个长指针。结构DRAWITEMSTRUCT 定义如下：
+typedef struct tagDRAWITEMSTRUCT {
+    UINT   CtlType;
+    UINT   CtlID;
+    UINT   itemID;
+    UINT   itemAction;
+    UINT   itemState;
+    HWND   hwndItem;
+    HDC    hDC;
+    RECT   rcItem;
+    DWORD  itemData;
+} DRAWITEMSTRUCT;
+该结构中部分成员变量作用如下：
+CtlType：表示控件类型，当为常量 ODT_BUTTON 表示为自绘制按钮。
+CtlID ：表示控件的 ID。
+ItemAction：绘制动作。
+ItemState：在当前绘制动作完成后，确定控件所处状态。
+HwndItem：控件窗口的句柄。
+HDC：设备环境句柄。
+RcItem：确定自绘制控件大小的矩形。
+通过DRAWITEMSTRUCT结构中的各成员变量，就可以为控件的自绘制提供必要的条件。
+
+■ 第四步：
+利用 ClassWizard 中定义一个 COwnerDrawBton 类对象 m_BtonOD（如下图 5-7）：注意在 VC++ 中，必须采用这种方式来定义对象 m_BtonOD，如果是在类定义文件中手工定义该对象的话，则不会执行超越的虚函数 DrawItem( )。同样，如果是不定义该对象的话，则不会执行函数DrawItem( )。
+
+
+■ 第五步：
+向函数 DrawItem() 中加入以下代码：
+
+void COwnerDrawBton::DrawItem(LPDRAWITEMSTRUCT lpDrawItemStruct) 
+{
+ // TODO: Add your code to draw the specified item
+ CDC *pDC;
+ CRect rcBton;
+ CDC dcMem;
+ 
+ BITMAP s_Bmp;
+ CBitmap m_Bitmap;
+ CBitmap *pOldBitmap;
+      
+ pDC = CDC::FromHandle(lpDrawItemStruct -> hDC);   
+                                     // 将设备环境句柄转换为指向设备环境的指针
+
+ rcBton = lpDrawItemStruct -> rcItem; // 获取按钮控件大小
+ 
+ m_Bitmap.LoadBitmap(IDB_Bmp);   // 载入位图
+ dcMem.CreateCompatibleDC(pDC);  // 创建于内存设备环境相兼容的设备环境
+
+ pOldBitmap = dcMem.SelectObject(&m_Bitmap);    
+                                     // 将位图对象选入到内存设备环境中
+ m_Bitmap.GetBitmap(&s_Bmp);     // 获取位图信息
+ 
+ pDC -> StretchBlt(rcBton.left,rcBton.top,rcBton.Width(),rcBton.Height(),
+     &dcMem,0,0,s_Bmp.bmWidth,s_Bmp.bmHeight,SRCCOPY); 
+                                     // 将位图从内存设备环境拷贝到显示设备环境
+ dcMem.SelectObject(pOldBitmap);   // 删除刚才选入到内存设备环境的位图对象
+}
+
+在上面的代码只是为了说明如何进行按钮控件的自绘制，它距实用要求还有一段距离。因为在对话框上每个自绘制的按钮控件都会调用 DrawItem( ) 函数。所以在 DrawItem( ) 函数内部，还必须根据结构 DRAWITEMSTRUCT 的成员变量 CtlID 来区分不同的按钮控件，进而再采取不同的操作。同时还需根据按钮控件的不同状态，进行不同的操作。
+在上一节中讲述的 CBitmapButton 类实际上也是通过对按钮控件进行自绘制而实现的。但是在向按钮上绘制图像时它是采用函数 BitBlt( )，而不是使用函数 StretchBlt( )，因而造成 CBitmapButton 类位图按钮上的位图大小不会随控件大小改变而改变。根据这一原理，我们自己创建一个与 CBitmapButton 作用和使用方法相似类 CBmpBton，它也可以使用四幅不同的位图来表示按钮不同的状态，位图的命名原则同 CBitmapButton 完全一致。不同的是，它无需使用诸如 AutoLoad( ) 一类的函数来加载位图。的其他部分同上面的 COwnerDrawBton 完全一致，只不过是函数 DrawItem( ) 的实现不同，下面就是类 CBmpBton 的 DrawItem( ) 函数的实现代码：
+
+void CBmpBton::DrawItem(LPDRAWITEMSTRUCT lpDIS)
+{
+ CRect rcBton;
+ CDC *pDC;
+ 
+ UINT action;
+ UINT CtrID;
+ CString strCaption;
+
+ CBitmap m_Bitmap;
+ CBitmap *pOldBitmap;
+ CDC dcMem;
+ BITMAP s_Bmp;
+ 
+ rcBton.CopyRect(&lpDIS -> rcItem);
+ pDC = CDC::FromHandle(lpDIS -> hDC);
+ state = lpDIS -> itemState;
+ action = lpDIS -> itemAction;
+ CtrID = lpDIS -> CtlID;
+
+ GetWindowText(strCaption);
+ // GetDlgItemText(CtrID,strCaption);
+
+ dcMem.CreateCompatibleDC(pDC);
+ 
+ if(state == 16)
+ {
+  if(m_Bitmap.LoadBitmap(strCaption + _T("F")))
+   {
+   pOldBitmap = dcMem.SelectObject(&m_Bitmap);
+   m_Bitmap.GetBitmap(&s_Bmp);
+  pDC -> StretchBlt(rcBton.left,rcBton.top,rcBton.Width(),rcBton.Height(),
+    &dcMem,0,0,s_Bmp.bmWidth,s_Bmp.bmHeight,SRCCOPY); 
+   }
+  else 
+   {
+   if(m_Bitmap.LoadBitmap(strCaption + _T("U")))
+    {
+    pOldBitmap = dcMem.SelectObject(&m_Bitmap);
+    m_Bitmap.GetBitmap(&s_Bmp);
+   pDC->StretchBlt(rcBton.left,rcBton.top,rcBton.Width(),rcBton.Height(),
+    &dcMem,0,0,s_Bmp.bmWidth,s_Bmp.bmHeight,SRCCOPY); 
+    }
+   else
+    {
+    TRACE("必须载入一副位图");
+    }
+   }
+ }
+ else if(state == 4)
+ {
+  if(m_Bitmap.LoadBitmap(strCaption + _T("X")))
+  {
+   pOldBitmap = dcMem.SelectObject(&m_Bitmap);
+   m_Bitmap.GetBitmap(&s_Bmp);
+  pDC -> StretchBlt(rcBton.left,rcBton.top,rcBton.Width(),rcBton.Height(),
+    &dcMem,0,0,s_Bmp.bmWidth,s_Bmp.bmHeight,SRCCOPY); 
+  }
+ }
+ else if(state & ODS_SELECTED)
+ {
+  if(m_Bitmap.LoadBitmap(strCaption + _T("D")))
+  {
+   pOldBitmap = dcMem.SelectObject(&m_Bitmap);
+   m_Bitmap.GetBitmap(&s_Bmp);
+  pDC -> StretchBlt(rcBton.left,rcBton.top,rcBton.Width(),rcBton.Height(),
+    &dcMem,0,0,s_Bmp.bmWidth,s_Bmp.bmHeight,SRCCOPY); 
+  }
+ }
+ else 
+ {
+  if(m_Bitmap.LoadBitmap(strCaption + _T("U")))
+  {
+   pOldBitmap = dcMem.SelectObject(&m_Bitmap);
+   m_Bitmap.GetBitmap(&s_Bmp);
+  pDC -> StretchBlt(rcBton.left,rcBton.top,rcBton.Width(),rcBton.Height(),
+                     &dcMem,0,0,s_Bmp.bmWidth,s_Bmp.bmHeight,SRCCOPY); 
+  }
+  else
+  {
+   TRACE("必须载入一副位图 U");
+  }
+ }
+ 
+ dcMem.SelectObject(pOldBitmap);
+
+}
+★ 5--4--1 在对话框上使用图像
+本节的知识，在前面的内容中其实已基本涉及到了，现就总结归纳一下。在对话框上使用图像，可采用以下几种方法：
+
+① 使用静态图像控件。采用这种方式时，既可以在对话框上显示小幅图像作为装饰，又可在必要时显示整幅图像作为对话框的背景。但在设计对话框时要首先象对话框上加入静态图像控件，否则其它控件就会被所显示的图形遮挡。这是在对话框上使用图像最简单的方法。
+② 使用 CBitmapButton 类位图按钮在对话框上显示图像。一般很少采用这种方式来显示图案。但在某些特殊情况下时，例如要求对鼠标指针的移动具有感应功能时，这是最简单易行的方法。示例可见 P112 5—2—3 CBitmapButton 类位图按钮。
+③ 重载对话框的 OnPaint( ) 函数。在 OnPaint( ) 函数中进行所需的绘图操作。这通常是在对话框上显示作为背景的位图的最好方式，不会出现背景图案将对话框上的其它控件遮挡住的情况。同使用 CBitmapButton 类位图按钮一样，利用这种方法能够实现像“金山词霸”那样有限的 Skin 效果。示例可见 P108 5—5—1 从资源中读取位图。
+④ 使用 Microsoft Forms 2.0 Image ActiveX 控件。这是在对话框上显示真彩色图像最简单的方式。但也不要认为这种方法尽善尽美，使用该方法有可能在这台机器上显示的图像精美绝伦，而在那台机器上就一塌糊涂。
+
+在上述的方法中，只有最后两种具有显示真彩色图像的能力，使用方法④并不是太可靠；使用方法③因为涉及到 DIB 文件的读取又显得略为复杂。实际上，并不是只有采用真彩色图像才能取得华丽的界面效果，而且大量的采用真彩色图像会导致程序过于庞大。一种很好解决方法是使用经过色彩抖动的 256 色图像来代替真彩色图像。作为对读者的一个建议，抓图工具 HyperSnap-DX 其实是进行色彩抖动及图像缩放的一个极好工具。
+

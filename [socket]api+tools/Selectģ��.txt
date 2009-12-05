@@ -1,0 +1,123 @@
+Windows网络编程系列教程之四：Select模型 (1) 
+--------------------------------------------------------------------------------
+讲一下套接字模式和套接字I/O模型的区别。先说明一下，只针对Winsock，如果你要骨头里挑鸡蛋把UNIX下的套接字概念来往这里套，那就不关我的事。
+套接字模式：阻塞套接字和非阻塞套接字。或者叫同步套接字和异步套接字。
+套接字模型：描述如何对套接字的I/O行为进行管理。
+Winsock提供的I/O模型一共有五种：
+select,WSAAsyncSelect,WSAEventSelect,Overlapped,Completion。今天先讲解select。
+
+1：select模型（选择模型）
+先看一下下面的这句代码：
+int iResult = recv(s, buffer,1024);
+这是用来接收数据的，在默认的阻塞模式下的套接字里，recv会阻塞在那里，直到套接字连接上有数据可读，把数据读到buffer里后recv函数才会返回，不然就会一直阻塞在那里。在单线程的程序里出现这种情况会导致主线程（单线程程序里只有一个默认的主线程）被阻塞,这样整个程序被锁死在这里，如果永远没数据发送过来，那么程序就会被永远锁死。这个问题可以用多线程解决，但是在有多个套接字连接的情况下，这不是一个好的选择，扩展性很差。Select模型就是为了解决这个问题而出现的。
+再看代码：
+
+int iResult = ioctlsocket(s, FIOBIO, (unsigned long *)&ul);
+iResult = recv(s, buffer,1024);
+
+这一次recv的调用不管套接字连接上有没有数据可以接收都会马上返回。原因就在于我们用ioctlsocket把套接字设置为非阻塞模式了。不过你跟踪一下就会发现，在没有数据的情况下，recv确实是马上返回了，但是也返回了一个错误：WSAEWOULDBLOCK，意思就是请求的操作没有成功完成。看到这里很多人可能会说，那么就重复调用recv并检查返回值，直到成功为止，但是这样做效率很成问题，开销太大。
+感谢天才的微软工程师吧，他们给我们提供了好的解决办法。
+先看看select函数
+int select(
+int nfds, 
+fd_set FAR *readfds, 
+fd_set FAR *writefds, 
+fd_set FAR *exceptfds, 
+const struct timeval FAR *timeout 
+);
+第一个参数不要管，会被系统忽略的。第二个参数是用来检查套接字可读性，也就说检查套接字上是否有数据可读，同样，第三个参数用来检查数据是否可以发出。最后一个是检查是否有带外数据可读取。
+参数详细的意思请去看MSDN，这里限于篇幅不详细解释了。
+最后一个参数是用来设置select等待多久的，是个结构：
+
+
+struct timeval {
+long tv_sec; // seconds 
+long tv_usec; // and microseconds 
+};
+如果将这个结构设置为(0,0)，那么select函数会马上返回。
+说了这么久，select的作用到底是什么？
+他的作用就是：防止在在阻塞模式的套接字里被锁死，避免在非阻塞套接字里重复检查WSAEWOULDBLOCK错误。
+他的工作流程如下：
+1：用FD_ZERO宏来初始化我们感兴趣的fd_set，也就是select函数的第二三四个参数。
+2：用FD_SET宏来将套接字句柄分配给相应的fd_set。
+3：调用select函数。
+4：用FD_ISSET对套接字句柄进行检查，如果我们所关注的那个套接字句柄仍然在开始分配的那个fd_set里，那么说明马上可以进行相应的IO操作。比如一个分配给select第一个参数的套接字句柄在select返回后仍然在select第一个参数的fd_set里，那么说明当前数据已经来了，马上可以读取成功而不会被阻塞。
+
+下面给出一个简单的select模型的服务端套接字。
+
+#include “iostream.h”
+#include “winsock2.h”
+#include “windows.h”
+
+
+#define InternetAddr "127.0.0.1"
+#define iPort 5055
+
+#pragma comment(lib, "ws2_32.lib")
+
+
+void main()
+{
+　　　　WSADATA wsa;
+　　　　WSAStartup(MAKEWORD(2,2), &wsa);
+　　　　
+　　　　SOCKET fdServer = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+　　　　
+　　　　struct sockaddr_in server;
+　　　　server.sin_family = AF_INET;
+　　　　server.sin_addr.s_addr = inet_addr(InternetAddr);
+　　　　server.sin_port = htons(iPort);
+　　　　
+　　　　int ret = bind(fdServer, (sockaddr*)&server, sizeof(server));
+　　　　ret = listen(fdServer, 4);
+
+
+　　　　SOCKET AcceptSocket; 
+　　　　fd_set fdread;
+　　　　timeval tv;
+　　　　int nSize; 
+
+　　　　while(1)
+　　　　{
+　　　　　　　　
+　　　　　　　　FD_ZERO(&fdread);//初始化fd_set
+　　　　　　　　FD_SET(fdServer, &fdread);//分配套接字句柄到相应的fd_set
+　　　　　　　　
+　　　　　　　　
+　　　　　　　　tv.tv_sec = 2;//这里我们打算让select等待两秒后返回，避免被锁死，也避免马上返回
+　　　　　　　　tv.tv_usec = 0;
+　　　　　　　　
+　　　　　　　　select(0, &fdread, NULL, NULL, &tv);
+　　　　　　　　
+　　　　　　　　nSize = sizeof(server);
+　　　　　　　　if (FD_ISSET(fdServer, &fdread))//如果套接字句柄还在fd_set里，说明客户端已经有connect的请求发过来了，马上可以accept成功
+　　　　　　　　{
+　　　　　　　　　　　　AcceptSocket = accept(fdServer,( sockaddr*) &server, &nSize);
+　　　　　　　　　　　　break;
+　　　　　　　　}
+　　　　　　　　
+　　　　　　　　else//还没有客户端的connect请求，我们可以去做别的事，避免像没有用select方式的阻塞套接字程序被锁死的情况，如果没用select,当程序运行到accept的时候客户端恰好没有connect请求，那么程序就会被锁死，做不了任何事情
+　　　　　　　　{
+　　　　　　　　　　　　//do something
+　　　　　　　　　　　　::MessageBox(NULL, "waiting...", "recv", MB_ICONINFORMATION);//别的事做完后，继续去检查是否有客户端连接请求
+　　　　　　　　}
+　　　　}
+
+　　　　char buffer[128];
+　　　　ZeroMemory(buffer, 128);
+
+　　　　ret = recv(AcceptSocket,buffer,128,0);//这里同样可以用select，用法和上面一样
+
+　　　　::MessageBox(NULL, buffer, "recv", MB_ICONINFORMATION);
+
+　　　　closesocket(AcceptSocket);
+　　　　WSACleanup();
+　　　　
+　　　　return;
+
+}
+
+基本上就这样，个人感觉select模型用处不是很大，我只用过一次，去年写端口扫描器的时候用select来检查超时。
+感觉讲得不是很清楚，虽然东西我很明白，但是要讲解出来讲解得很清楚真不容易。
+不知道大家能不能看懂，如果看得过程中有什么问题就问吧。
+

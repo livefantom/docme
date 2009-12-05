@@ -1,0 +1,132 @@
+1、如何改变对话框的背景颜色
+
+方法一：调用CWinApp类的成员函数SetDialogBkColor来实现。
+
+---- 其中函数的第一个参数指定了背景颜色，第二个参数指定了文本颜色。下面的例子是将应用程序对话框设置为蓝色背景和红色文本，步骤如下：
+
+---- ① 新建一个基于Dialog的MFC AppWizard应用程序ExampleDlg。
+
+---- ② 在CExampleDlgApp ::InitInstance()中添加如下代码：
+
+BOOL CExampleDlgApp: : InitInstance ( )
+{
+    //…
+    CExampleDlgDlg dlg;
+    m_pMainWnd = &dlg;
+
+    //先于DoModal()调用，将对话框设置为蓝色背景、红色文本
+    SetDialogBkColor(RGB(0,0,255),RGB(255,0,0));
+    int nResponse = dlg.DoModal();
+    //…
+}
+
+---- 编译并运行，此时对话框的背景色和文本色已发生了改变。值得注意的是：在调用DoModal()之前必须先调用SetDialogBkColor，且此方法是将改变应用程序中所有的对话框颜色，并不能针对某一个指定的对话框。
+
+方法二：重载OnPaint()，即WM_PAINT消息。有关代码如下（以上例工程为准）：
+
+void CExampleDlgDlg::OnPaint()
+{
+    if (IsIconic())
+    {
+        //…
+    }
+    else
+    {
+        CRect rect;
+        CPaintDC dc(this);
+        GetClientRect(rect);
+        dc.FillSolidRect(rect,RGB(0,255,0)); //设置为绿色背景
+
+        CDialog::OnPaint();
+    }
+}
+
+方法三：重载OnCtlColor (CDC* pDC, CWnd* pWnd, UINT nCtlColor)，
+即WM_CTLCOLOR消息。具体步骤如下（以上例工程为准）：
+---- ①在CExampleDlgDlg的头文件中，添加一CBrush的成员变量：
+
+class CExampleDlgDlg : public CDialog
+{
+    //...
+protected:
+    CBrush m_brush;
+    //...
+};
+
+
+---- ②在OnInitDialog()函数中添加如下代码：
+BOOL CExampleDlgDlg::OnInitDialog()
+{
+    //...
+    // TODO: Add extra initialization here
+    m_brush.CreateSolidBrush(RGB(0, 255, 0)); // 生成一绿色刷子
+    //...
+}
+
+---- ③利用ClassWizard重载OnCtlColor(…)，即WM_CTLCOLOR消息：
+HBRUSH CExampleDlgDlg::OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor)
+{
+/*
+** 这里不必编写任何代码！
+**下行代码要注释掉
+** HBRUSH hbr = CDialog::OnCtlColor(pDC, pWnd, nCtlColor);
+*/
+
+    return m_brush; //返加绿色刷子
+}
+
+
+ 方法四：还是重载OnCtlColor (CDC* pDC, CWnd* pWnd, UINT nCtlColor)，
+即WM_CTLCOLOR消息。具体步骤如下（以上例工程为准）：
+---- 步骤①、②同上方法三中的步骤①、②。
+
+---- 步骤③利用ClassWizard重载OnCtlColor(…)（即WM_CTLCOLOR消息）时则有些不同：
+
+HBRUSH CExampleDlgDlg::OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor)
+{
+    HBRUSH hbr = CDialog::OnCtlColor(pDC, pWnd, nCtlColor);
+
+    //在这加一条是否为对话框的判断语句
+    if(nCtlColor ==CTLCOLOR_DLG)
+        return m_brush; //返加绿色刷子
+    return hbr; 
+}
+
+
+
+2、 如何在OnCtlColor里使对话框透明（以及如何改變對話框外觀）
+
+方法一：HBRUSH CMyDlg::OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor)
+{
+    //设置透明背景模式
+    pDC->SetBkMode(TRANSPARENT);
+    //设置背景刷子为空
+    return (HBRUSH)::GetStockObject(HOLLOW_BRUSH);
+} 
+方法二：我们可以改变对话框的背景颜色，或对话框中的控件颜色以使得程序界面不至于千篇一律，如何做呢？每个控件和对话框在显示之前回发送WM_CTLCOLOR消息，如果派生对话框类对WM_CTLCOLOR消息进行了映射，就可以设定文本的前景色和背景色。同时还可以为控件或对话框的非文本区域选择一个刷子。
+
+　　WM_CTLCOLOR消息对应的函数为OnCtlColor，OnCtlColor函数的原型为：afx_msg HBRUSH OnCtlColor( CDC* pDC, CWnd* pWnd, UINT nCtlColor );其中参数pDC是：一个指向设备环境的指针。pWnd：指定特定的控件。nCtlColor:指明控件类型。可以有以下类型：
+
+CTLCOLOR_BTN button control
+CTLCOLOR_DLG dialog box
+CTLCOLOR_EDIT edit control
+CTLCOLOR_LISTBOX list box
+CTLCOLOR_MSGBOX message box
+CTLCOLOR_SCROLLBAR scroll bar
+CTLCOLOR_STATIC static text, frame, or rectangle
+
+现在为了突出显示文本框的显示号码，我们将文本框的文字背景设为黄色。
+
+步骤1、添加一个成员变量 HBRUSH m_hBrush;
+步骤2、用Class Wizard为CGuessDlg加入WM_CTLCOLOR消息，并编辑OnCtlColor函数：
+
+HBRUSH CGuessDlg::OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor)
+{
+    if(nCtlColor==CTLCOLOR_EDIT)
+    {
+        pDC->SetBkColor(RGB(255,255,0));//EDIT控件文字背景为黄色
+        return m_hBrush;
+    }
+    return CDialog::OnCtlColor(pDC, pWnd, nCtlColor);
+}
+  

@@ -1,0 +1,51 @@
+struct sockaddr_in addr;
+addr.sin_family = AF_INET;	// address family(must be AF_INET)
+addr.sin_port = 80;		// ip port
+addr.sin_port = 192.168.1.216;	// ip address
+addr.sin_zero;			// padding to make structure the same size as SOCKADDR.
+
+//----------------------------------
+// The inet_addr function converts a string containing an (Ipv4) Internet Protocol dotted address into a proper address for the IN_ADDR structure.
+unsigned long inet_addr(
+  const char* cp
+);
+
+//------------------------------------
+FD_CLR(s, *set) 
+// Removes the descriptor s from set. 
+FD_ISSET(s, *set) 
+// Nonzero if s is a member of the set. Otherwise, zero. 
+FD_SET(s, *set) 
+// Adds descriptor s to set. 
+// 添加描述符(/套接字)s到（集合）set中。
+FD_ZERO(*set) 
+// Initializes the set to the null set. 
+
+int __WSAFDIsSet(
+  SOCKET fd,
+  fd_set* set
+);
+// 如果套接字fd是参数set所指定的集合的元素之一，则返回非零；
+// 如果不是，则返回0.
+
+//-----------------------------------
+int select(
+  int nfds,		// [in] Ignored. The nfds parameter is included only for compatibility with Berkeley sockets. 
+  fd_set* readfds,	// [in, out] Optional pointer to a set of sockets to be checked for readability. 
+  fd_set* writefds,	// [in, out] Optional pointer to a set of sockets to be checked for writability. 
+  fd_set* exceptfds,	// [in, out] Optional pointer to a set of sockets to be checked for errors. 
+  const struct timeval* timeout	// [in] Maximum time for select to wait, provided in the form of a TIMEVAL structure. Set the timeout parameter to null for blocking operations. 
+);
+
+//------------------------------------
+调用WSAEventSelect将套接字设置为事件对象模型。。。
+
+WSAEventSelect方法的操作与WSAAsyncSelect非常相似，
+不同之处在于：在指定的网络事件发生时所采取的动作。
+WSAAsyncSelect引起一个应用程序指定的窗口消息被发送。
+WSAEventSelect设置相关联的事件对象，并(/在一个内部网络事件记录中/)记录这个事件的发生。
+应用程序可以使用WSAWaitForMultipleEvents等待或获取该事件对象，
+并使用WSAEnumNetworkEvent重新得到内部网络事件记录的内容，
+从而确定所指定的网络事件中哪个已经发生。
+
+

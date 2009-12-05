@@ -1,0 +1,10 @@
+关于TCHAR
+
+【UNICODE模式】下：
+
+TCHAR = wchar_t
+_tcsclen	= wcslen, _tcsnccat	= wscncat, _tcsnccpy	= wcsncpy, ...
+_totupper	= towupper, _totlower	= towlower, ...
+_tprintf	= wprintf, _tscanf	= wscanf
+_fgettc		= fgetwc, _fputtc	= fputwc
+_itot		= _itow, _ttoi		= _wtoi

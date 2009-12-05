@@ -1,0 +1,41 @@
+在VC中使用WebBrowser控件的两方法
+黄森堂（vcmfc)著
+
+ClassWizard方式：
+
+1.创建包装类：View->ClassWizard->Add Class->Form a Type Library->C:\winnt\system32\shdocvw.dll->只选择IWebBrowserApp类->OK->OK
+2.声明一个类变量：IWebBrowserApp m_internetexplorer;,并包含刚才的头文件(xxx.h)
+3.在类的构造函数中调用COleDispathDrive::CreateDispatch()函数，加载服务器，如下代码：
+  m_internetexplorer.CreateDispatch("InternetExplorer.Application.1");
+4.在类的析构函数中调用COleDispathDrive::ReleaseDispatch()函数，加载服务器，如下代码：
+  m_internetexplorer.CreateDispatch();
+5.在程序中指定URL地址后进行打开WEB页，如下代码：
+  VARIANT vInfo;
+  vInfo.vt=VT_EMPTY;
+  m_internetexplorer.Navigate("地址",&vInfo,&vInfo,&vInfo,&vInfo);
+  m_internetexploret.SetVisible(TRUE);
+
+备注：还可以使用插入控件的方式来控制IE的，只需要几步就可以了，如下：
+1.在VC中插入WebBrowser控件，并产生相应的包装类CWebBrowser2
+2.声明一个该类的变量m_webBrowser,可用ClassWizard的变量映射来进行。
+3.在程序中指定URL地址后进行打开WEB页，如下代码：
+  VARIANT vInfo;
+  vInfo.vt = VT_EMPTY;
+  m_webBrowser.Navigate("你的网页地址", &vInfo, &vInfo, &vInfo, &vInfo);
+  m_webBrowser.SetVisible(TRUE);
+
+#import方式：
+
+1.使用import导入类，在你的类的头文件加入以下代码：
+  #import "c:\winnt\system32\shdocvw.dll" rename ("tagREADYSTATE","tagIEREADYSTATE")
+    using namespace SHDocvw;
+2.声明一个类变量：IWebBrowserAppPtr m_internetexplorer;
+3.在类的构造函数中调用COleDispathDrive::CreateDispatch()函数，加载服务器，如下代码：
+  m_internetexplorer->CreateInstance("InternetExplorer.Application.1");
+4.在程序中指定URL地址后进行打开WEB页，如下代码：
+  VARIANT vInfo;
+  vInfo.vt=VT_EMPTY;
+  m_internetexplorer->Navigate("地址",&vInfo,&vInfo,&vInfo,&vInfo);
+  m_internetexploret->PutVisible(TRUE);
+
+以上是从《应用Visual Studio 6.0》书上摘下来的，本人没有测试过！

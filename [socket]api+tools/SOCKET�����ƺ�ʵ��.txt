@@ -1,0 +1,750 @@
+
+SOCKET类的设计和实现 
+
+
+WinSock基本知识 
+
+这里不打算系统地介绍socket或者WinSock的知识。首先介绍WinSock API函数，讲解阻塞/非阻塞的概念；然后介绍socket的使用。
+
+
+WinSock API 
+
+Socket接口是网络编程（通常是TCP/IP协议，也可以是其他协议）的API。最早的Socket接口是Berkeley接口，在Unxi操作系统中实现。WinSock也是一个基于Socket模型的API，在Microsoft Windows操作系统类中使用。它在Berkeley接口函数的基础之上，还增加了基于消息驱动机制的Windows扩展函数。Winscok1.1只支持TCP/IP网络，WinSock2.0增加了对更多协议的支持。这里，讨论TCP/IP网络上的API。
+
+Socket接口包括三类函数：
+
+第一类是WinSock API包含的Berkeley socket函数。这类函数分两部分。第一部分是用于网络I/O的函数，如
+
+accept、Closesocket、connect、recv、recvfrom、Select、Send、Sendto
+
+另一部分是不涉及网络I/O、在本地端完成的函数，如
+
+bind、getpeername、getsockname、getsocketopt、htonl、htons、inet_addr、inet_nton
+
+ioctlsocket、listen、ntohl、ntohs、setsocketopt、shutdow、socket等
+
+第二类是检索有关域名、通信服务和协议等Internet信息的数据库函数，如
+
+gethostbyaddr、gethostbyname、gethostname、getprotolbyname
+
+getprotolbynumber、getserverbyname、getservbyport。
+
+第三类是Berkekley socket例程的Windows专用的扩展函数，如gethostbyname对应的WSAAsynGetHostByName（其他数据库函数除了gethostname都有异步版本），select对应的WSAAsynSelect，判断是否阻塞的函数WSAIsBlocking，得到上一次Windsock API错误信息的WSAGetLastError，等等。
+
+从另外一个角度，这些函数又可以分为两类，一是阻塞函数，一是非阻塞函数。所谓阻塞函数，是指其完成指定的任务之前不允许程序调用另一个函数，在Windows下还会阻塞本线程消息的发送。所谓非阻塞函数，是指操作启动之后，如果可以立即得到结果就返回结果，否则返回表示结果需要等待的错误信息，不等待任务完成函数就返回。
+
+首先，异步函数是非阻塞函数；
+
+其次，获取远地信息的数据库函数是阻塞函数（因此，WinSock提供了其异步版本）；
+
+在Berkeley socket函数部分中，不涉及网络I/O、本地端工作的函数是非阻塞函数；
+
+在Berkeley socket函数部分中，网络I/O的函数是可阻塞函数，也就是它们可以阻塞执行，也可以不阻塞执行。这些函数都使用了一个socket，如果它们使用的socket是阻塞的，则这些函数是阻塞函数；如果它们使用的socket是非阻塞的，则这些函数是非阻塞函数。
+
+创建一个socket时，可以指定它是否阻塞。在缺省情况下，Berkerley的Socket函数和WinSock都创建“阻塞”的socket。阻塞socket通过使用select函数或者WSAAsynSelect函数在指定操作下变成非阻塞的。WSAAsyncSelect函数原型如下。
+
+int WSAAsyncSelect( 
+
+SOCKET s, 
+
+HWND hWnd, 
+
+u_int wMsg, 
+
+long lEvent 
+
+);
+
+其中，参数1指定了要操作的socket句柄；参数2指定了一个窗口句柄；参数3指定了一个消息，参数4指定了网络事件，可以是多个事件的组合，如：
+
+FD_READ 准备读
+
+FD_WRITE 准备写
+
+FD_OOB 带外数据到达
+
+FD_ACCEPT 收到连接
+
+FD_CONNECT 完成连接
+
+FD_CLOSE 关闭socket。
+
+用OR操作组合这些事件值，如FD_READ|FD_WRITE
+
+WSAAsyncSelect函数表示对socket s监测lEvent指定的网络事件，如果有事件发生，则给窗口hWnd发送消息wMsg。
+
+假定应用程序的一个socket s指定了监测FD_READ事件，则在FD_READ事件上变成非阻塞的。当read函数被调用时，不管是否读到数据都马上返回，如果返回一个错误信息表示还在等待，则在等待的数据到达后，消息wMsg发送给窗口hWnd，应用程序处理该消息读取网络数据。
+
+对于异步函数的调用，以类似的过程最终得到结果数据。以gethostbyname的异步版本的使用为例进行说明。该函数原型如下：
+
+HANDLE WSAAsyncGetHostByName( 
+
+HWND hWnd, 
+
+u_int wMsg, 
+
+const char FAR *name, 
+
+char FAR *buf, 
+
+int buflen 
+
+);
+
+在调用WSAAsyncGetHostByName启动操作时，不仅指定主机名字name，还指定了一个窗口句柄hWnd，一个消息ID wMsg，一个缓冲区及其长度。如果不能立即得到主机地址，则返回一个错误信息表示还在等待。当要的数据到达时，WinSock DLL给窗口hWnd发送消息wMsg告知得到了主机地址，窗口过程从指定的缓冲区buf得到主机地址。
+
+使用异步函数或者非阻塞的socket，主要是为了不阻塞本线程的执行。在多进程或者多线程的情况下，可以使用两个线程通过同步手段来完成异步函数或者非阻塞函数的功能。
+
+
+Socket的使用 
+
+WinSock以DLL的形式提供，在调用任何WinSock API之前，必须调用函数WSAStartup进行初始化，最后，调用函数WSACleanUp作清理工作。
+
+MFC使用函数AfxSocketInit包装了函数WSAStartup，在WinSock应用程序的初始化函数IninInstance中调用AfxSocketInit进行初始化。程序不必调用WSACleanUp。
+
+
+Socket是网络通信过程中端点的抽象表示。Socket在实现中以句柄的形式被创建，包含了进行网络通信必须的五种信息：连接使用的协议，本地主机的IP地址，本地进程的协议端口，远地主机的IP地址，远地进程的协议端口。
+
+要使用socket，首先必须创建一个socket；然后，按要求配置socket；接着，按要求通过socket接收和发送数据；最后，程序关闭此socket。
+
+
+为了创建socket，使用socket函数得到一个socket句柄： 
+
+socket_handle = socket(protocol_family. Socket_type, protocol);
+
+其中：protocol_family指定socket使用的协议，取值PF_INET，表示Internet(TCP/IP)协议族；Socket_type指socket面向连接或者使用数据报；第三个参数表示使用TCP或者UDP协议。
+
+当一个socket被创建时，WinSock将为一个内部结构分配内存，在此结构中保存此socket的信息，到此，socket连接使用的协议已经确定。
+
+
+创建了socket之后，配置socket。 
+
+对于面向连接的客户，WinSock自动保存本地IP地址和选择协议端口，但是必须使用connect函数配置远地IP地址和远地协议端口：
+
+result = connect(socket_handle, remote_socket_address, address_length)
+
+remote_socket_address是一个指向特定socket结构的指针，该地址结构为socket保存了地址族、协议端口、网络主机地址。
+
+面向连接的服务器则使用bind指定本地信息，使用listen和accept获取远地信息。
+
+使用数据报的客户或者服务器使用bind给socket指定本地信息，在发送或者接收数据时指定远地信息。
+
+bind给socket指定一个本地IP地址和协议端口，如下：
+
+result = bind( socket_hndle, local_socket_address, address_length)
+
+参数类型同connect。
+
+函数listen监听bind指定的端口，如果有远地客户请求连接，使用accept接收请求，创建一个新的socket，并保存信息。
+
+socket_new = accept(socket_listen, socket_address, address_length)
+
+
+在socket配置好之后，使用socket发送或者接收数据。 
+
+面向连接的socket使用send发送数据，recv接收数据；
+
+使用数据报的socket使用sendto发送数据，recvfrom接收数据。
+
+
+MFC对WinSockt API的封装 
+
+MFC提供了两个类CAsyncSocket和CSocket来封装WinSock API，这给程序员提供了一个更简单的网络编程接口。
+
+CAsyncSocket在较低层次上封装了WinSock API，缺省情况下，使用该类创建的socket是非阻塞的socket，所有操作都会立即返回，如果没有得到结果，返回WSAEWOULDBLOCK，表示是一个阻塞操作。
+
+CSocket建立在CAsyncSocket的基础上，是CAsyncSocket的派生类。也就是缺省情况下使用该类创建的socket是非阻塞的socket，但是CSocket的网络I/O是阻塞的，它在完成任务之后才返回。CSocket的阻塞不是建立在“阻塞”socket的基础上，而是在“非阻塞”socket上实现的阻塞操作，在阻塞期间，CSocket实现了本线程的消息循环，因此，虽然是阻塞操作，但是并不影响消息循环，即用户仍然可以和程序交互。
+
+
+CAsyncSocket 
+
+CAsyncSocket封装了低层的WinSock API，其成员变量m_hSocket保存其对应的socket句柄。使用CAsyncSocket的方法如下：
+
+首先，在堆或者栈中构造一个CAsyncSocket对象，例如：
+
+CAsyncSocket sock；或者
+
+CAsyncSocket *pSock = new CAsyncSocket；
+
+其次，调用Create创建socket，例如：
+
+使用缺省参数创建一个面向连接的socket
+
+sock.Create() 
+
+指定参数参数创建一个使用数据报的socket，本地端口为30
+
+pSocket.Create(30, SOCK_DGRM)；
+
+其三，如果是客户程序，使用Connect连接到远地；如果是服务程序，使用Listen监听远地的连接请求。
+
+其四，使用成员函数进行网络I/O。
+
+最后，销毁CAsyncSocket，析构函数调用Close成员函数关闭socket。
+
+
+下面，分析CAsyncSocket的几个函数，从中可以看到它是如何封装低层的WinSock API，简化有关操作的；还可以看到它是如何实现非阻塞的socket和非阻塞操作。
+
+
+socket对象的创建和捆绑 
+
+（1）Create函数
+
+首先，讨论Create函数，分析socket句柄如何被创建并和CAsyncSocket对象关联。Create的实现如下：
+
+BOOL CAsyncSocket::Create(UINT nSocketPort, int nSocketType,
+
+long lEvent, LPCTSTR lpszSocketAddress)
+
+{
+
+if (Socket(nSocketType, lEvent))
+
+{
+
+if (Bind(nSocketPort,lpszSocketAddress))
+
+return TRUE;
+
+int nResult = GetLastError();
+
+Close();
+
+WSASetLastError(nResult);
+
+}
+
+return FALSE;
+
+}
+
+其中：
+
+参数1表示本socket的端口，缺省是0，如果要创建数据报的socket，则必须指定一个端口号。
+
+参数2表示本socket的类型，缺省是SOCK_STREAM，表示面向连接类型。
+
+参数3是屏蔽位，表示希望对本socket监测的事件，缺省是FD_READ | FD_WRITE | FD_OOB | FD_ACCEPT | FD_CONNECT | FD_CLOSE。
+
+参数4表示本socket的IP地址字符串，缺省是NULL。
+
+Create调用Socket函数创建一个socket，并把它捆绑在this所指对象上，监测指定的网络事件。参数2和3被传递给Socket函数，如果希望创建数据报的socket，不要使用缺省参数，指定参数2是SOCK_DGRM。
+
+如果上一步骤成功，则调用bind给新的socket分配端口和IP地址。
+
+（2）Socket函数
+
+接着，分析Socket函数，其实现如下：
+
+BOOL CAsyncSocket::Socket(int nSocketType, long lEvent,
+
+int nProtocolType, int nAddressFormat)
+
+{
+
+ASSERT(m_hSocket == INVALID_SOCKET);
+
+
+m_hSocket = socket(nAddressFormat,nSocketType,nProtocolType);
+
+if (m_hSocket != INVALID_SOCKET)
+
+{
+
+CAsyncSocket::AttachHandle(m_hSocket, this, FALSE);
+
+return AsyncSelect(lEvent);
+
+}
+
+return FALSE;
+
+}
+
+其中：
+
+参数1表示Socket类型，缺省值是SOCK_STREAM。
+
+参数2表示希望监测的网络事件，缺省值同Create，指定了全部事件。
+
+参数3表示使用的协议，缺省是0。实际上，SOCK_STREAM类型的socket使用TCP协议，SOCK_DGRM的socket则使用UDP协议。
+
+参数4表示地址族（地址格式），缺省值是PF_INET（等同于AF_INET）。对于TCP/IP来说，协议族和地址族是同值的。
+
+在socket没有被创建之前，成员变量m_hSocket是一个无效的socket句柄。Socket函数把协议族、socket类型、使用的协议等信息传递给WinSock API函数socket，创建一个socket。如果创建成功，则把它捆绑在this所指对象。
+
+（3）捆绑（Attatch）
+
+捆绑过程类似于其他Windows对象，将在模块线程状态的WinSock映射中添加一对新的映射：this所指对象和新创建的socket对象的映射。
+
+另外，如果本模块线程状态的“socket窗口”没有创建，则创建一个，该窗口在异步操作时用来接收WinSock的通知消息，窗口句柄保存到模块线程状态的m_hSocketWindow变量中。函数AsyncSelect将指定该窗口为网络事件消息的接收窗口。
+
+函数AttachHandle的实现在此不列举了。
+
+（4）指定要监测的网络事件
+
+在捆绑完成之后，调用AsyncSelect指定新创建的socket将监测的网络事件。AsyncSelect实现如下：
+
+BOOL CAsyncSocket::AsyncSelect(long lEvent)
+
+{
+
+ASSERT(m_hSocket != INVALID_SOCKET);
+
+
+_AFX_SOCK_THREAD_STATE* pState = _afxSockThreadState;
+
+ASSERT(pState->m_hSocketWindow != NULL);
+
+
+return WSAAsyncSelect(m_hSocket, pState->m_hSocketWindow,
+
+WM_SOCKET_NOTIFY, lEvent) != SOCKET_ERROR;
+
+}
+
+函数参数lEvent表示希望监视的网络事件。
+
+_ afxSockThreadState得到的是当前的模块线程状态，m_ hSocketWindow是本模块在当前线程的“socket窗口”，指定监视m_hSocket的网络事件，如指定事件发生，给窗口m_hSocketWindow发送WM_SOCKET_NOTIFY消息。
+
+被指定的网络事件对应的网络I/O将是异步操作，是非阻塞操作。例如：指定FR_READ导致Receive是一个异步操作，如果不能立即读到数据，则返回一个错误WSAEWOULDBLOCK。在数据到达之后，WinSock通知窗口m_hSocketWindow，导致OnReceive被调用。
+
+指定FR_WRITE导致Send是一个异步操作，即使数据没有送出也返回一个错误WSAEWOULDBLOCK。在数据可以发送之后，WinSock通知窗口m_hSocketWindow，导致OnSend被调用。
+
+指定FR_CONNECT导致Connect是一个异步操作，还没有连接上就返回错误信息WSAEWOULDBLOCK，在连接完成之后，WinSock通知窗口m_hSocketWindow，导致OnConnect被调用。
+
+对于其他网络事件，就不一一解释了。
+
+所以，使用CAsyncSocket时，如果使用Create缺省创建socket，则所有网络I/O都是异步操作，进行有关网络I/O时则必须覆盖以下的相关函数：
+
+OnAccept、OnClose、OnConnect、OnOutOfBandData、OnReceive、OnSend。
+
+（5）Bind函数
+
+经过上述过程，socket创建完毕，下面，调用Bind函数给m_hSocket指定本地端口和IP地址。Bind的实现如下：
+
+BOOL CAsyncSocket::Bind(UINT nSocketPort, LPCTSTR lpszSocketAddress)
+
+{
+
+USES_CONVERSION;
+
+
+//使用WinSock的地址结构构造地址信息
+
+SOCKADDR_IN sockAddr;
+
+memset(&sockAddr,0,sizeof(sockAddr));
+
+
+//得到地址参数的值
+
+LPSTR lpszAscii = T2A((LPTSTR)lpszSocketAddress);
+
+//指定是Internet地址类型
+
+sockAddr.sin_family = AF_INET;
+
+
+if (lpszAscii == NULL)
+
+//没有指定地址，则自动得到一个本地IP地址
+
+//把32比特的数据从主机字节序转换成网络字节序
+
+sockAddr.sin_addr.s_addr = htonl(INADDR_ANY);
+
+else
+
+{
+
+//得到地址
+
+DWORD lResult = inet_addr(lpszAscii);
+
+if (lResult == INADDR_NONE)
+
+{
+
+WSASetLastError(WSAEINVAL);
+
+return FALSE;
+
+}
+
+sockAddr.sin_addr.s_addr = lResult;
+
+}
+
+
+//如果端口为0，则WinSock分配一个端口（1024—5000）
+
+//把16比特的数据从主机字节序转换成网络字节序
+
+sockAddr.sin_port = htons((u_short)nSocketPort);
+
+
+//Bind调用WinSock API函数bind
+
+return Bind((SOCKADDR*)&sockAddr, sizeof(sockAddr));
+
+}
+
+其中：函数参数1指定了端口；参数2指定了一个包含本地地址的字符串，缺省是NULL。
+
+函数Bind首先使用结构SOCKADDR_IN构造地址信息。该结构的域sin_family表示地址格式（TCP/IP同协议族），赋值为AF_INET（Internet地址格式）；域sin_port表示端口，如果参数1为0，则WinSock分配一个端口给它，范围在1024和5000之间；域sin_addr是表示地址信息，它是一个联合体，其中s_addr表示如下形式的字符串，“28.56.22.8”。如果参数没有指定地址，则WinSock自动地得到本地IP地址（如果有几个网卡，则使用其中一个的地址）。
+
+（6）总结Create的过程
+
+首先，调用socket函数创建一个socket；然后把创建的socket对象映射到CAsyncSocket对象（捆绑在一起），指定本socket要通知的网络事件，并创建一个“socket窗口”来接收网络事件消息，最后，指定socket的本地信息。
+
+下一步，是使用成员函数Connect连接远地主机，配置socket的远地信息。函数Connect类似于Bind，把指定的远地地址转换成SOCKADDR_IN对象表示的地址信息（包括网络字节序的转换），然后调用WinSock函数Connect连接远地主机，配置socket的远地端口和远地IP地址。
+
+
+异步网络事件的处理 
+
+当网络事件发生时，“socket窗口”接收WM_SOCKET_NOTIFY消息，消息处理函数OnSocketNotify被调用。“socket窗口”的定义和消息处理是MFC实现的，这里不作详细的讨论。
+
+OnSocketNotify回调CAsyncSocket的成员函数DoCallBack，DoCallBack调用事件处理函数，如OnRead、OnWrite等。摘录DoCallBack的一段代码如下：
+
+switch (WSAGETSELECTEVENT(lParam))
+
+{
+
+case FD_READ:
+
+{
+
+DWORD nBytes;
+
+//得到可以一次读取的字节数
+
+pSocket->IOCtl(FIONREAD, &nBytes);
+
+if (nBytes != 0)
+
+pSocket->OnReceive(nErrorCode);
+
+}
+
+break;
+
+case FD_WRITE:
+
+pSocket->OnSend(nErrorCode);
+
+break;
+
+case FD_OOB:
+
+pSocket->OnOutOfBandData(nErrorCode);
+
+break;
+
+case FD_ACCEPT:
+
+pSocket->OnAccept(nErrorCode);
+
+break;
+
+case FD_CONNECT:
+
+pSocket->OnConnect(nErrorCode);
+
+break;
+
+case FD_CLOSE:
+
+pSocket->OnClose(nErrorCode);
+
+break;
+
+
+lParam是WM_SOCKET_NOFITY的消息参数，OnSocketNotify传递给函数DoCallBack，表示通知事件。
+
+函数IOCtl是CAsyncSocket的成员函数，用来对socket的I/O进行控制。这里的使用表示本次调用Receive函数至多可以读nBytes个字节。
+
+从上面的讨论可以看出，从创建socket到网络I/O，CAsyncSocket直接封装了低层的WinSock API，简化了WinSock编程，实现了一个异步操作的界面。如果希望某个操作是阻塞操作，则在调用Create时不要指定该操作对应的网络事件。例如，希望Connect和Send是阻塞操作，在任务完成之后才返回，则可以使用如下的语句：
+
+pSocket->Create(0, SOCK_STREAM, 
+
+FR_WRITE|FR_OOB|FR_ACCEPT|FR_CLOSE);
+
+这样，在Connect和Send时，如果是用户界面线程的话，可能阻塞线程消息循环。所以，最好在工作者线程中使用阻塞操作。
+
+
+CSocket 
+
+如果希望在用户界面线程中使用阻塞socket，则可以使用CSocket。它在非阻塞socket基础之上实现了阻塞操作，在阻塞期间实现了消息循环。
+
+对于CSocket，处理网络事件通知的函数OnAccept、OnClose、OnReceive仍然可以使用，OnConnect、OnSend在CSocket中永远不会被调用，另外OnOutOfBandData在CSocket中不鼓励使用。
+
+CSocket对象在调用Connect、Send、Accept、Close、Receive等成员函数后，这些函数在完成任务之后（连接被建立、数据被发送、连接请求被接收、socket被关闭、数据被读取）之后才会返回。因此，Connect和Send不会导致OnConnect和OnSend被调用。如果覆盖虚拟函数OnReceive、OnAccept、OnClose，不主动调用Receive、Accept、Close，则在网络事件到达之后导致对应的虚拟函数被调用，虚拟函数的实现应该调用Receive、Accept、Close来完成操作。下面，就一个函数Receive来考察CSocket如何实现阻塞操作和消息循环的。
+
+int CSocket::Receive(void* lpBuf, int nBufLen, int nFlags)
+
+{
+
+//m_pbBlocking是CSocket的成员变量，用来标识当前是否正在进行
+
+//阻塞操作。但不能同时进行两个阻塞操作。
+
+if (m_pbBlocking != NULL)
+
+{
+
+WSASetLastError(WSAEINPROGRESS);
+
+return FALSE;
+
+}
+
+//完成数据读取
+
+int nResult;
+
+while ((nResult = CAsyncSocket::Receive(lpBuf, nBufLen, nFlags)) 
+
+== SOCKET_ERROR)
+
+{
+
+if (GetLastError() == WSAEWOULDBLOCK)
+
+{
+
+//进入消息循环，等待网络事件FD_READ
+
+if (!PumpMessages(FD_READ))
+
+return SOCKET_ERROR;
+
+}
+
+else
+
+return SOCKET_ERROR;
+
+}
+
+return nResult;
+
+}
+
+其中：
+
+参数1指定一个缓冲区保存读取的数据；参数2指定缓冲区的大小；参数3取值MSG_PEEK（数据拷贝到缓冲区，但不从输入队列移走），或者MSG_OOB（处理带外数据），或者MSG_PEEK|MSG_OOB。
+
+Receive函数首先判断当前CSocket对象是否正在处理一个阻塞操作，如果是，则返回错误WSAEINPROGRESS；否则，开始数据读取的处理。
+
+读取数据时，如果基类CAsyncSocket的Receive读取到了数据，则返回；否则，如果返回一个错误，而且错误号是WSAEWOULDBLOCK，则表示操作阻塞，于是调用PumpMessage进入消息循环等待数据到达（网络事件FD_READ发生）。数据到达之后退出消息循环，再次调用CAsyncSocket的Receive读取数据，直到没有数据可读为止。
+
+PumpMessages是CSocket的成员函数，它完成以下工作：
+
+（1）设置m_pbBlocking，表示进入阻塞操作。
+
+（2）进行消息循环，如果有以下事件发生则退出消息循环：收到指定定时器的定时事件消息WM_TIMER，退出循环，返回TRUE；收到发送给本socket的消息WM_SOCKET_NOTIFY，网络事件FD_CLOSE或者等待的网络事件发生，退出循环，返回TRUE；发送错误或者收到WM_QUIT消息，退出循环，返回FALSE；
+
+（3）在消息循环中，把WM_SOCKET_DEAD消息和发送给其他socket的通知消息WM_SOCKET_NOFITY放进模块线程状态的通知消息列表m_listSocketNotifications，在阻塞操作完成之后处理；对其他消息，则把它们送给目的窗口的窗口过程处理。
+
+
+CSocketFile 
+
+MFC还提供了一个网络编程模式，可以充分利用CSocket的特性。该模式的基础是CSocketFile类。使用方法如下：
+
+首先，构造一个CSocket对象；调用Create函数创建一个socket对象（SOCK_STREAM类型）。
+
+接着，如果是客户程序，调用Connect连接到远地主机；如果是服务器程序，先调用Listen监听socket端口，收到连接请求后调用Accept接收请求。
+
+然后，创建一个和CSocket对象关联的CSocketFile对象，创建一个和CSocketFile对象关联的CArchive对象，指定CArchive对象是用于读或者写。如果既要读又要写，则创建两个CArchive对象。
+
+创建工作完成之后，使用CArchive对象在客户和服务器之间传送数据
+
+使用完毕，销毁CArchive对象、CSocketFile对象、CSocket对象。
+
+从前面的章节可以知道，CArchive可以以一个CFile对象为基础，通过<<和>>操作符完成对文件的二进制流的操作。所以可以从CFile派生一个类，实现CFile的操作界面（Read和Write）。由于CSocket提供了阻塞操作，所以完全可以像读写文件一样读写socket数据。
+
+下面，分析CSocketFile的设计和实现。
+
+
+CSocketFile的构造函数和析构函数的实现 
+
+
+构造函数的实现 
+
+CSocketFile::CSocketFile(CSocket* pSocket, BOOL bArchiveCompatible)
+
+{
+
+m_pSocket = pSocket;
+
+m_bArchiveCompatible = bArchiveCompatible;
+
+
+#ifdef _DEBUG
+
+ASSERT(m_pSocket != NULL);
+
+ASSERT(m_pSocket->m_hSocket != INVALID_SOCKET);
+
+
+int nType = 0;
+
+int nTypeLen = sizeof(int);
+
+ASSERT(m_pSocket->GetSockOpt(SO_TYPE,&nType,&nTypeLen));
+
+ASSERT(nType == SOCK_STREAM);
+
+#endif // _DEBUG
+
+}
+
+其中：
+
+构造函数的参数1指向关联的CSocket对象，被保存在成员变量m_pSocket中；
+
+参数2指定该对象是否和一个CArchive对象关联（不关联则独立使用），被保存在成员变量bArchiveCompatible中。
+
+Degug部分用于检测m_pSocket是否是SOCK_STREAM类型。
+
+
+析构函数的实现 
+
+CSocketFile::~CSocketFile()
+
+{
+
+}
+
+（2）CSocketFile的读写的实现
+
+分析CSocketFile如何用文件的读写实现网络I/O。
+
+
+文件读的实现 
+
+UINT CSocketFile::Read(void* lpBuf, UINT nCount)
+
+{
+
+ASSERT(m_pSocket != NULL);
+
+
+int nRead;
+
+
+//CSocketFile对象独立使用
+
+if (!m_bArchiveCompatible)
+
+{
+
+int nLeft = nCount;
+
+PBYTE pBuf = (PBYTE)lpBuf;
+
+
+//读完nCount个字节的数据
+
+while(nLeft > 0)
+
+{
+
+//CSocket的Receive，阻塞操作，读取到数据才继续
+
+nRead = m_pSocket->Receive(pBuf, nLeft);
+
+if (nRead == SOCKET_ERROR)
+
+{
+
+int nError = m_pSocket->GetLastError();
+
+AfxThrowFileException(CFileException::generic, nError);
+
+ASSERT(FALSE);
+
+}
+
+else if (nRead == 0)
+
+{
+
+return nCount - nLeft;
+
+}
+
+
+nLeft -= nRead;
+
+pBuf += nRead;
+
+}
+
+return nCount - nLeft;
+
+}
+
+
+//和一个CArchive对象关联使用
+
+//读取数据，能读多少是多少
+
+nRead = m_pSocket->Receive(lpBuf, nCount, 0);
+
+if (nRead == SOCKET_ERROR)
+
+{
+
+int nError = m_pSocket->GetLastError();
+
+AfxThrowFileException(CFileException::generic, nError);
+
+ASSERT(FALSE);
+
+}
+
+return nRead;
+
+}
+
+
+文件写的实现 
+
+void CSocketFile::Write(const void* lpBuf, UINT nCount)
+
+{
+
+ASSERT (m_pSocket!=NULL);
+
+
+//CSocket的函数Send，阻塞操作，发送完毕才继续
+
+int nWritten = m_pSocket->Send(lpBuf, nCount);
+
+if (nWritten == SOCKET_ERROR)
+
+{
+
+int nError = m_pSocket->GetLastError();
+
+AfxThrowFileException(CFileException::generic, nError);
+
+}
+
+}
+
+从CSockefFile的读写实现可以看出，CSocketFile如果独立使用，在Read操作时可能出现无限等待，因为数据是分多个消息多次送达的，没有读取到指定长度的数据并不表示数据读取完毕。但是和CArchive配合使用，则仅仅读取到数据就返回。至于数据是否读取完毕，可以使用CArchive的IsBufferEmpty函数来判断。
+
+其他CFile界面，CSocketFile没有实现。
+
+从CScocketFile的设计和实现来看，CSocketFile是使用CSocket的一个很好的例子，也是使用CFile的一个例子。
+
+
+--------------------------------------------------------------------------------
+上一章　回目录 
+
+ 
+
+　
