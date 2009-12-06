@@ -1,0 +1,245 @@
+有关partition scan的案例 
+=========================================================== 
+作者: shiyihai(http://shiyihai.itpub.net)
+发表于: 2007.07.16 16:09
+分类: oracle 
+出处: http://shiyihai.itpub.net/post/2333/308719
+--------------------------------------------------------------- 
+
+
+表结构如下：
+SQL> desc msg_request_history
+Name Type Nullable Default Comments 
+---------- ------------ -------- ------- -------- 
+MSGTYPE NUMBER(8) 0 
+MSGKEY VARCHAR2(50) 
+MSGDATE DATE Y SYSDATE 
+STATUS NUMBER(2) Y 0 
+按msgdate按天来分区。
+
+SQL> set autotrace traceonly;
+SQL>
+SQL> select count(*) from msg_request_history
+2 where trunc(MSGDATE)= trunc(to_date('20070719','yyyy-mm-dd'))
+3 and MSGKEY='11175998';
+
+
+
+
+
+执行计划
+----------------------------------------------------------
+0 SELECT STATEMENT Optimizer=CHOOSE (Cost=3 Card=1 Bytes=36)
+1 0 SORT (AGGREGATE)
+2 1 PARTITION RANGE (ALL)
+3 2 TABLE ACCESS (FULL) OF 'MSG_REQUEST_HISTORY' (Cost=3 C
+ard=1 Bytes=36)
+由于where条件中是trunc(MSGDATE)，并没有用到partition prune，走的是PARTITION RANGE (ALL)。
+
+SQL> select count(*) from msg_request_history
+2 where MSGDATE= to_date('20070719000000','yyyy-mm-dd hh24:mi:ss')
+3 and MSGKEY='11175998';
+
+
+执行计划
+----------------------------------------------------------
+0 SELECT STATEMENT Optimizer=CHOOSE (Cost=2 Card=1 Bytes=36)
+1 0 SORT (AGGREGATE)
+2 1 PARTITION RANGE (SINGLE)
+3 2 TABLE ACCESS (FULL) OF 'MSG_REQUEST_HISTORY' (Cost=2 C
+ard=1 Bytes=36)
+由于where条件中是MSGDATE = ，实现了partition prune，走的是PARTITION RANGE (SINGLE)。
+
+SQL> select count(*) from msg_request_history
+2 where MSGDATE between to_date('20070719000000','yyyy-mm-dd hh24:mi:ss') and to_date('20070721000000','yyyy-mm-dd hh24:mi:ss')
+3 and MSGKEY='11175998';
+
+
+执行计划
+----------------------------------------------------------
+0 SELECT STATEMENT Optimizer=CHOOSE (Cost=56 Card=1 Bytes=36)
+1 0 SORT (AGGREGATE)
+2 1 FILTER
+3 2 PARTITION RANGE (ITERATOR)
+4 3 TABLE ACCESS (FULL) OF 'MSG_REQUEST_HISTORY' (Cost=5
+6 Card=1 Bytes=36)
+
+由于where条件中是MSGDATE between and ，同样实现了partition prune，走的是PARTITION RANGE (ITERATOR)。Executes child operations for each partition in the table specified by a range of partition keys。
+
+接下来在msgkey列上创建normal index。
+SQL> create index indx_msg_request_history on msg_request_history(msgkey);
+
+Index created
+
+SQL> 
+SQL> select count(*) from msg_request_history
+2 where MSGDATE= to_date('20070719000000','yyyy-mm-dd hh24:mi:ss')
+3 and MSGKEY='11175998';
+
+
+执行计划
+----------------------------------------------------------
+0 SELECT STATEMENT Optimizer=CHOOSE (Cost=2 Card=1 Bytes=36)
+1 0 SORT (AGGREGATE)
+2 1 TABLE ACCESS (BY GLOBAL INDEX ROWID) OF 'MSG_REQUEST_HIS
+TORY' (Cost=2 Card=1 Bytes=36)
+
+3 2 INDEX (RANGE SCAN) OF 'INDX_MSG_REQUEST_HISTORY' (NON-
+UNIQUE) (Cost=1 Card=21)
+
+发现走的是index range scan，并没有PARTITION RANGE (SINGLE)。
+
+SQL> select trunc(msgdate),count(*) from msg_request_history group by trunc(msgdate);
+
+TRUNC(MSGDATE) COUNT(*)
+-------------- ----------
+2007-7-19 23368
+2007-7-20 23368
+2007-7-21 23368
+2007-7-23 70104
+
+SQL> select sum(bytes/1024/1024)||'M' from user_segments where segment_name=upper('indx_msg_request_history');
+
+SUM(BYTES/1024/1024)||'M'
+-----------------------------------------
+4M
+
+SQL> select sum(bytes/1024/1024)||'M' from user_segments where segment_name=upper('msg_request_history');
+
+SUM(BYTES/1024/1024)||'M'
+-----------------------------------------
+6.4375M
+
+SQL> 
+SQL> exec COMMON_PARTITION.PROC_DROP_ALL_PARTITIONS('20070731');
+
+PL/SQL procedure successfully completed
+
+SQL> select trunc(msgdate),count(*) from msg_request_history group by trunc(msgdate);
+
+TRUNC(MSGDATE) COUNT(*)
+-------------- ----------
+
+SQL> select sum(bytes/1024/1024)||'M' from user_segments where segment_name=upper('msg_request_history');
+
+SUM(BYTES/1024/1024)||'M'
+-----------------------------------------
+.0625M
+
+SQL> select sum(bytes/1024/1024)||'M' from user_segments where segment_name=upper('indx_msg_request_history');
+
+SUM(BYTES/1024/1024)||'M'
+-----------------------------------------
+4M
+
+SQL> select trunc(msgdate),count(*) from msg_request_history group by trunc(msgdate);
+
+TRUNC(MSGDATE) COUNT(*)
+-------------- ----------
+
+SQL> 
+SQL> alter index indx_msg_request_history rebuild online;
+
+Index altered
+
+SQL> select sum(bytes/1024/1024)||'M' from user_segments where segment_name=upper('indx_msg_request_history');
+
+SUM(BYTES/1024/1024)||'M'
+-----------------------------------------
+.0625M
+
+SQL> 
+在drop分区后发现normal index并没有释放空间，也就是说索引得需重建才行。即使在drop partition的时候带上“update global indexes”也不能回缩索引，看来这个选项只能用在分区索引上。
+
+
+将normal index给删除掉创建local non-prefixed partition index后执行计划如下：
+SQL> create index indx_msg_request_history on msg_request_history(msgkey) local;
+
+Index created
+
+SQL> select count(*) from msg_request_history
+2 where MSGDATE= to_date('20070719000000','yyyy-mm-dd hh24:mi:ss')
+3 and MSGKEY='11175998';
+执行计划
+----------------------------------------------------------
+0 SELECT STATEMENT Optimizer=CHOOSE (Cost=2 Card=1 Bytes=36)
+1 0 SORT (AGGREGATE)
+2 1 PARTITION RANGE (SINGLE)
+3 2 TABLE ACCESS (BY LOCAL INDEX ROWID) OF 'MSG_REQUEST_HI
+STORY' (Cost=2 Card=1 Bytes=36)
+
+4 3 INDEX (RANGE SCAN) OF 'INDX_MSG_REQUEST_HISTORY' (NO
+N-UNIQUE) (Cost=1 Card=8)
+
+可看到性能提高很多。同时对于的索引数据也跟着缩小。
+SQL> select trunc(msgdate),count(*) from msg_request_history group by trunc(msgdate);
+
+TRUNC(MSGDATE) COUNT(*)
+-------------- ----------
+2007-7-19 23368
+2007-7-20 23368
+2007-7-21 23368
+2007-7-23 70104
+
+SQL> exec COMMON_PARTITION.PROC_DROP_PARTITION('20070720');
+
+PL/SQL procedure successfully completed
+
+SQL> exec COMMON_PARTITION.PROC_DROP_PARTITION('20070721');
+
+PL/SQL procedure successfully completed
+
+SQL> exec COMMON_PARTITION.PROC_DROP_PARTITION('20070722');
+
+PL/SQL procedure successfully completed
+
+SQL> exec COMMON_PARTITION.PROC_DROP_PARTITION('20070723');
+
+PL/SQL procedure successfully completed
+
+SQL> select sum(bytes/1024/1024)||'M' from user_segments where segment_name=upper('indx_msg_request_history');
+
+SUM(BYTES/1024/1024)||'M'
+-----------------------------------------
+1.6875M
+
+SQL> select sum(bytes/1024/1024)||'M' from user_segments where segment_name=upper('msg_request_history');
+
+SUM(BYTES/1024/1024)||'M'
+-----------------------------------------
+1.875M
+
+SQL> 
+
+下面是创建global索引
+SQL> create index indx_msg_request_history on msg_request_history(msgkey) global;
+
+Index created
+SQL> select count(*) from msg_request_history
+2 where MSGDATE= to_date('20070719000000','yyyy-mm-dd hh24:mi:ss')
+3 and MSGKEY='11175998';
+
+COUNT(*)
+----------
+4
+
+
+执行计划
+----------------------------------------------------------
+0 SELECT STATEMENT Optimizer=CHOOSE (Cost=2 Card=1 Bytes=36)
+1 0 SORT (AGGREGATE)
+2 1 TABLE ACCESS (BY GLOBAL INDEX ROWID) OF 'MSG_REQUEST_HIS
+TORY' (Cost=2 Card=1 Bytes=36)
+
+3 2 INDEX (RANGE SCAN) OF 'INDX_MSG_REQUEST_HISTORY' (NON-
+UNIQUE) (Cost=1 Card=31)
+可看出global index也即normal方式的索引。
+
+发觉有一段话来形容分区表和分区索引特别好，先引用如下（分区表的通俗解释）：
+普通表呢像一个小学生用的新华字典，分区表呢像一套博士们辞海，在同一个漂亮的盒子里面(表名）有若干本辞海分册（每一册就是一个分区了）。 
+如果说检索一张普通表就像查新化字典，检索分区表就像查辞海了。具体而言呢，又这么几种方式： 
+1). 因为你知道你查的内容只会出现在某些分册里面，于是你很快的从辞海盒子里面取出你要的那个册子，不加思索的翻到索引页，根据索引页的指示，你飞快的翻到你的目标页面。取一本本册子呢就叫partition range　[inlist] iterator，找索引页当然就是index range scan。如果你不找索引页，准备翻完整本书的找，那就是full table scan了。如果你只找一本册子的，那partition range iterator也就不必了。 
+2). 哦，你不知道你要查的内容在那本册子里？　那你只好辛苦一点，翻阅所有册子了。这时，你做的动作就叫partition range all. 　而对于每本册子言，也许你会找索引页（index scan），也许你想翻遍全册（full table scan）。 
+3). 也许你发现一册册的打开索引页找内容太繁重了，你突然想起来对你的辞海做个整改。于是你把每册的索引页全都拆了下来，专门装订成一册。每次你想利用索引页找东西时，你就打开这个索引册。从索引册，你就可以找到你要内容在哪一册哪个地方。这就是global index scan. 相对于1,2，就叫local index scan. 
+4). 你有儿子吗？有一天，你想培训儿子的能力，于是你就找来你儿子给你翻册子，找资料。可是你儿子非得和老子一起找才肯帮你。于是你们父子俩就开始一起检索起辞海来，你查某些册子，他查另一些册子。这就叫partition scan.
+

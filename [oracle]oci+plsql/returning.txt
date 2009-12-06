@@ -1,0 +1,20 @@
+declare
+  nUserID number;
+begin
+  update ums_role
+     set role_id = 100
+   where role_id = 1
+  returning nvl(user_id, 0) into nUserID;
+  if (SQL%ROWCOUNT = 0) then
+    dbms_output.put_line('rowcount = 0');
+    rollback;
+  end if;
+  if (nUserID is null) then
+    dbms_output.put_line('userid is null');
+    nUserID:= nvl(nUserID, 0);
+     dbms_output.put_line(nUserID);
+ end if;
+end;
+/
+
+update ... returning into 不会抛NO_DATA_FOUND异常，但值会`is null'.

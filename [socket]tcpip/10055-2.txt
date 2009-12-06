@@ -1,0 +1,68 @@
+10055 问题设想解决方案  大 | 中 | 小    2008/01/11    13:22    1794    huzhangyou2002  服务器开发  
+既然问题已经确定了，就可以开始按照问题来提出解决方案了。对Cker大哥以及Sima大哥表示深深的感谢以及致敬。
+
+问题定义：
+
+引用
+WSAENOBUFS
+10055
+
+No buffer space available. 
+An operation on a socket could not be performed because the system lacked sufficient buffer space or because a queue was full.
+
+
+
+
+朋友Sima给我解析了一些没有深知的问题。
+
+第一：既然是接受缓冲满了，就应该考虑停止客户端发送，当然是无法停止客户端发送的，只能在服务器这边处理，可以考虑如果错误是10055的时候，将此时接收的Client踢掉。
+第二：缓冲区既然满了，可以考虑扩大缓冲区，这个缓冲区其实是一段未分页内存， 这个未分页内存是比较有限的。这个数字暂时没有官方文章说出，只是有一些网友说出数字是1/8 物理内存大小。
+第三：
+
+引用
+
+1/11/2008  12:47:05 PM  Sima  huzhangyou2002@gmail.com 发送出去了，缓冲区就释放了 
+1/11/2008  12:47:05 PM  Sima  huzhangyou2002@gmail.com  说明你的网卡的发送能力强 
+1/11/2008  12:47:13 PM  Sima  huzhangyou2002@gmail.com  接收能力差 
+1/11/2008  12:47:14 PM  huzhangyou2002@gmail.com  Sima  接收呢？ 
+1/11/2008  12:47:19 PM  huzhangyou2002@gmail.com  Sima  难道和硬件有关系？ 
+1/11/2008  12:47:26 PM  Sima  huzhangyou2002@gmail.com  高级网卡的能力体现在接收上 
+1/11/2008  12:47:32 PM  Sima  huzhangyou2002@gmail.com  发送的能力都差不多 
+1/11/2008  12:47:53 PM  Sima  huzhangyou2002@gmail.com  高性能主要体现在收包的能力 
+
+
+
+后来在微软的文档中的参数说明中说到了这个缓冲的问题，非常兴奋：
+
+引用
+
+SO_RCVBUF  
+both int The default is implementation dependent. The Windows CE TCP/UDP provider uses 32768 bytes as default. The receive buffer can be set to a maximum of 1 MB. 
+This option specifies the total per-socket buffer space reserved for receives.
+
+For Windows CE .NET 4.1 and later, the default buffer space is set to 32768 bytes. You can change the per-socket buffer space by calling setsockopt.
+
+When a Windows Sockets implementation supports the SO_RCVBUF and SO_SNDBUF options, an application can request different buffer sizes (larger or smaller) by calling setsockopt. The call to setsockopt can succeed even when the implementation did not provide the whole amount requested. An application must call getsockopt (Windows Sockets) with the same option to check the buffer size actually provided. 
+
+
+
+
+
+引用
+
+SO_SNDBUF  both int The default is implementation dependent. This option sets the per-socket buffer size for sending data. When a Windows Sockets implementation supports the SO_RCVBUF and SO_SNDBUF options, an application or Windows Sockets SPI client can request different buffer sizes (larger or smaller). The call to setsockopt or WSPSetSockOpt can succeed even if the implementation did not provide the whole amount requested. 
+This is unrelated to SO_MAX_MSG_SIZE or the size of a TCP window. Care should be taken when setting the SO_SNDBUF value as setting this value either too high or too low can have a negative effect on performance. An application must call this function with the same option to check the buffer size actually provided. A value of 0 is not supported.
+
+
+
+从上面的两点，我们可以确认Sima兄长提到的第三点是有道理的。
+
+经过上面的分析基本可以确定如下解决方案：
+
+1：在WSARecv错误的时候，判断错误如果是10055,如果是 则Sleep(1).等待IOCP把数据取走，并继续投递一个WSARecv.
+2：在WSARecv错误的时候，将这个Client踢掉，这个方法不是很优雅，但是也不免是一种解决方法。
+3：使用setsockopt设置SO_RCVBUF为一个大一点的值，官方说法为最大1M，但是这个值不能随便设置，太大太小都不行。也应该用试验来确定，而且要看客户端的并发。
+
+CSDN有一个朋友提到 post的WSARecv里的buflen设为0，不锁定内存页位 
+见 10055问题，不过后面跟帖说明会造成用户中断。暂时不考虑测试了。
+当然前面两个方法均没有测试，下面我将写一个客户端模拟，并看看效果。到时候再用一篇文章来总结一下。 

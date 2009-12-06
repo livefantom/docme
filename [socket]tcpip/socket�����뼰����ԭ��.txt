@@ -1,0 +1,441 @@
+Windows Sockets 错误码及出错原因[转] 
+Windows Sockets在头文件winsock.h中定义了所有的错误码，它们包括以“WSA”打头的Windows Sockets实现返回的错误码和Berkeley Sockets定义的错误码全集。定义Berkeley Sockets错误码是为了确保原有软件的可移植性。 
+
+A.1  Windows Sockets错误码列表
+     表A.1列出了WSAGetLastError()函数返回的可能错误码和它们的解释，它们可分为四个部分。
+     错误码的第一部分是用来解决在不同的C编译中对标准C错误码的不一致的定义。错误码的第二部分是标准Berkeley Sockets错误码的Windows Sockets版本。错误码的第三部分包括特定Windows Sockets扩充的错误码。错误码的第四部分由Windows Sockets的getXbyY()和WSAAsyncGetXByY()函数返回，相当于Berkeley软件中由变量h_errno返回的错误（事实上，Windows Sockets在头文件winsock.h中已将h_error定义成其值为WSAGetLastError()的一个宏），它们相当于由域名服务（Domain Name Service）返回的各种失败。如果Windows Sockets实现没有使用域名服务，它将使用最合适的代码。一般地，Windows Sockets应用程序应该将错误WSAHOST_NOT_FOUND和WSANO_DATA解释为指示关键字（名字，地址等）没有找着，而错误WSATRY_AGAIN和WSANO_RECOVERY是提醒名字服务自身是非操作的。
+     错误码由Windows Sockets 规范定义，在所有同一版本规范的Windows Sockets兼容实现中，它们是一致的。
+ 
+表A.1  Windows Sockets错误码
+Windows Sockets错误码 Berkeley 对应错误码 错误号          解             释 
+WSAEINTR EINTR 10004 同标准C 
+WSAEBADF EBADF 10009 同标准C 
+WSAEACCES EACCES 10013 同标准C 
+WSAEFAULT EFAULT 10014 同标准C 
+WSAEINVAL EINVAL 10022 同标准C 
+WSAEMFILE EMFILE 10024 同标准C 
+WSAEWOULDBLOCK EWOULDBLOCK 10035 同BSD 
+WSAEINPROGRESS EINPROGRESS 10036 当一个阻塞函数正在进行时，调用任何Windows Sockets API函数均返回此错误 
+WSAEALREADY EALREADY 10037 同BSD 
+WSAENOTSOCK ENOTSOCK 10038 同BSD 
+WSAEDESTADDRREQ EDESTADDRREQ 10039 同BSD 
+WSAEMSGSIZE EMSGSIZE 10040 同BSD 
+WSAEPROTOTYPE EPROTOTYPE 10041 同BSD 
+WSAENOPROTOOPT ENOPROTOOPT 10042 同BSD 
+WSAEPROTONOSUPPORT EPROTONOSUPPORT 10043 同BSD 
+WSAESOCKTNOSUPPORT ESOCKTNOSUPPORT 10044 同BSD 
+WSAEOPNOTSUPP EOPNOTSUPP 10045 同BSD 
+WSAEPFNOSUPPORT EPFNOSUPPORT 10046 同BSD 
+WSAEAFNOSUPPORT EAFNOSUPPORT 10047 同BSD 
+WSAEADDRINUSE EADDRINUSE 10048 同BSD 
+WSAEADDRNOTAVAIL EADDRNOTAVAIL 10049 同BSD 
+WSAENETDOWN ENETDOWN 10050 同BSD。任何时候只要Windows Sockets实现检测到网络子系统失败，它就报告此错误。 
+WSAENETUNREACH ENETUNREACH 10051 同BSD 
+WSAENETRESET ENETRESET 10052 同BSD 
+WSAECONNABORTED ECONNABORTED 10053 同BSD 
+WSAECONNRESET ECONNRESET 10054 同BSD 
+WSAENOBUFS ENOBUFS 10055 同BSD 
+WSAEISCONN EISCONN 10056 同BSD 
+WSAENOTCONN ENOTCONN 10057 同BSD 
+WSAESHUTDOWN ESHUTDOWN 10058 同BSD 
+WSAETOOMANYREFS ETOOMANYREFS 10059 同BSD 
+WSAETIMEDOUT ETIMEDOUT 10060 同BSD 
+WSAECONNREFUSED ECONNREFUSED 10061 同BSD 
+WSAELOOP ELOOP 10062 同BSD 
+WSAENAMETOOLONG ENAMETOOLONG 10063 同BSD 
+WSAEHOSTDOWN EHOSTDOWN 10064 同BSD 
+WSAEHOSTUNREACH EHOSTUNREACH 10065 同BSD 
+WSASYSNOTREADY   10091 由WSAStartup() 返回，指示网络子系统无法使用。 
+WSAVERNOTSUPPORTED   10092 由WSAStartup() 返回，指示Windows Sockets
+DLL 不能支持此应用程序。 
+WSANOTINITIALISED   10093 由除WSAStartup()之外的其它函数返回，指示 尚没有一次成功的WSAStartup() 调用执行过。 
+WSAEDISCON   10101 由WSARecv()和WSARecvFrom()返回，指示远程方已经初始化了一个“雅致”的shutdown序列。 
+WSAHOST_NOT_FOUND HOST_NOT_FOUND 11001 同BSD 
+WSATRY_AGAIN TRY_AGAIN 11002 同BSD 
+WSANO_RECOVERY NO_RECOVERY 11003 同BSD 
+WSANO_DATA NO_DATA 11004 同BSD 
+
+
+ 
+A.2  Windows Sockets错误码扩展描述
+     下面给出WSAGetLastError()函数返回的可能错误码按字母顺序排列的列表，同时给出简要的扩展描述。
+WSAEACCES                          (10013)             Permission denied. 
+试图使用被禁止的访问权限去访问套接字。例如，在没有使用函数setsockopt()的SO_BROADCAST命令设置广播权限的套接字上使用函数sendto()给一个广播地址发送数据。
+ 
+WSAEADDRINUSE                 (10048)             Address already in use. 
+正常情况下每一个套接字地址（协议／IP地址／端口号）只允许使用一次。当应用程序试图使用bind()函数将一个被已存在的或没有完全关闭的或正在关闭的套接字使用了的IP地址／端口号绑扎到一个新套接字上时，该错误发生。对于服务器应用程序来说，如果需要使用bind()函数将多个套接字绑扎到同一个端口上，可以考虑使用setsockopt()函数的SO_REUSEADDR命令。客户应用程序一般不必使用bind()函数——connect()函数总是自动选择没有使用的端口号。当bind()函数操作的是通配地址（包括ADDR_ANY）时，错误WSAEADDRINUSE可能延迟到一个明确的地址被提交时才发生。这可能在后续的函数如connect()、listen()、WSAConnect()或WSAJoinLeaf()调用时发生。
+ 
+WSAEADDRNOTAVAIL         (10049)             Cannot assign requested address. 
+被请求的地址在它的环境中是不合法的。通常地在bind()函数试图将一个本地机器不合法的地址绑扎到套接字时产生。它也可能在connect()、sendto()、WSAConnect()、WSAJoinLeaf()或WSASendTo()函数调用时因远程机器的远程地址或端口号非法（如0地址或0端口号）而产生。
+ 
+WSAEAFNOSUPPORT            (10047)             Address family not supported by protocol family. 
+使用的地址与被请求的协议不兼容。所有的套接字在创建时都与一个地址族（如IP协议对应的AF_INET）和一个通用的协议类型（如SOCK_STREAM）联系起来。如果在socket()调用中明确地要求一个不正确的协议，或在调用sendto()等函数时使用了对套接字来说是错误的地址族的地址，该错误返回。
+ 
+WSAEALREADY                    (10037)             Operation already in progress. 
+当在非阻塞套接字上已经有一个操作正在进行时，又有一个操作试图在其上执行则产生此错误。如：在一个正在进行连接的非阻塞套接字上第二次调用connect()函数；或取消一个已经被取消或已完成的异步请求（WSAAsyncGetXbyY()）。
+ 
+WSAECONNABORTED           (10053)             Software caused connection abort. 
+一个已建立的连接被你的主机上的软件终止，可能是因为一次数据传输超时或是协议错误。
+ 
+WSAECONNREFUSED            (10061)             Connection refused. 
+因为目标主机主动拒绝，连接不能建立。这通常是因为试图连接到一个远程主机上不活动的服务，如没有服务器应用程序处于执行状态。
+ 
+WSAECONNRESET                (10054)             Connection reset by peer. 
+存在的连接被远程主机强制关闭。通常原因为：远程主机上对等方应用程序突然停止运行，或远程主机重新启动，或远程主机在远程方套接字上使用了“强制”关闭（参见setsockopt(SO_LINGER)）。另外，在一个或多个操作正在进行时，如果连接因“keep-alive”活动检测到一个失败而中断，也可能导致此错误。此时，正在进行的操作以错误码WSAENETRESET失败返回，后续操作将失败返回错误码WSAECONNRESET。
+ 
+WSAEDESTADDRREQ           (10039)             Destination address required. 
+在套接字上一个操作所必须的地址被遗漏。例如，如果sendto()函数被调用且远程地址为ADDR_ANY时，此错误被返回。
+ 
+WSAEFAULT                          (10014)             Bad address. 
+系统检测到调用试图使用的一个指针参数指向的是一个非法指针地址。如果应用程序传递一个非法的指针值，或缓冲区长度太小，此错误发生。例如，参数为结构sockaddr，但参数的长度小于sizeof(struct sockaddr)。
+ 
+WSAEHOSTDOWN                 (10064)             Host is down.
+套接字操作因为目的主机关闭而失败返回。套接字操作遇到不活动主机。本地主机上的网络活动没有初始化。这些条件由错误码WSAETIMEDOUT指示似乎更合适。
+ 
+WSAEHOSTUNREACH           (10065)             No route to host. 
+试图和一个不可达主机进行套接字操作。参见WSAENETUNREACH。
+ 
+WSAEINPROGRESS               (10036)             Operation now in progress. 
+一个阻塞操作正在执行。Windows Sockets只允许一个任务（或线程）在同一时间可以有一个未完成的阻塞操作，如果此时调用了任何函数（不管此函数是否引用了该套接字或任何其它套接字），此函数将以错误码WSAEINPROGRESS返回。
+ 
+WSAEINTR                            (10004)             Interrupted function call. 
+阻塞操作被函数WSACancelBlockingCall ()调用所中断。
+ 
+WSAEINVAL                           (10022)             Invalid argument. 
+提供了非法参数（例如，在使用setsockopt()函数时指定了非法的level）。在一些实例中，它也可能与套接字的当前状态相关，例如，在套接字没有使用listen()使其处于监听时调用accept()函数。
+ 
+WSAEISCONN                        (10056)             Socket is already connected. 
+连接请求发生在已经连接的套接字上。一些实现对于在已连接SOCK_DGRAM套接字上使用sendto()函数的情况也返回此错误（对于SOCK_STREAM套接字，sendto()函数的to参数被忽略），尽管其它一些实现将此操作视为合法事件。
+ 
+WSAEMFILE                          (10024)             Too many open files. 
+打开了太多的套接字。不管是对整个系统还是每一进程或线程，Windows Sockets实现都可能有一个最大可用的套接字句柄数。
+ 
+WSAEMSGSIZE                      (10040)             Message too long. 
+在数据报套接字上发送的一个消息大于内部消息缓冲区或一些其它网络限制，或者是用来接受数据报的缓冲区小于数据报本身。
+ 
+WSAENETDOWN                    (10050)             Network is down. 
+套接字操作遇到一个不活动的网络。此错误可能指示网络系统（例如WinSock DLL运行的协议栈）、网络接口或本地网络本身发生了一个严重的失败。
+ 
+WSAENETRESET                   (10052)             Network dropped connection on reset. 
+在操作正在进行时连接因“keep-alive”检测到失败而中断。也可能由setsockopt()函数返回，如果试图使用它在一个已经失败的连接上设置SO_KEEPALIVE。
+ 
+WSAENETUNREACH              (10051)             Network is unreachable. 
+试图和一个无法到达的网络进行套接字操作。它常常意味着本地软件不知道到达远程主机的路由。
+ 
+WSAENOBUFS                        (10055)             No buffer space available. 
+由于系统缺乏足够的缓冲区空间，或因为队列已满，在套接字上的操作无法执行。
+ 
+WSAENOPROTOOPT             (10042)             Bad protocol option. 
+在getsockopt()或setsockopt()调用中，指定了一个未知的、非法的或不支持的选项或层（level）。
+ 
+WSAENOTCONN                    (10057)             Socket is not connected. 
+因为套接字没有连接，发送或接收数据的请求不被允许，或者是使用sendto()函数在数据报套接字上发送时没有提供地址。任何其它类型的操作也可以返回此错误，例如，使用setsockopt()函数在一个已重置的连接上设置SO_KEEPALIVE。
+ 
+WSAENOTSOCK                    (10038)             Socket operation on non-socket.
+操作试图不是在套接字上进行。它可能是套接字句柄参数没有引用到一个合法套接字，或者是调用select()函数时，一个fd_set中的成员不合法。
+ 
+WSAEOPNOTSUPP                (10045)             Operation not supported. 
+对于引用的对象的类型来说，试图进行的操作不支持。通常它发生在套接字不支持此操作的套接字描述符上，例如，试图在数据报套接字上接收连接。
+ 
+WSAEPFNOSUPPORT            (10046)             Protocol family not supported. 
+协议簇没有在系统中配置或没有支持它的实现存在。它与WSAEAFNOSUPPORT有些微的不同，但在绝大多数情况下是可互换的，返回这两个错误的所有Windows Sockets函数的说明见WSAEAFNOSUPPORT的描述。
+ 
+WSAEPROCLIM                     (10067)             Too many processes.
+Windows Sockets实现可能限制同时使用它的应用程序的数量，如果达到此限制，WSAStartup()函数可能因此错误失败。
+ 
+WSAEPROTONOSUPPORT     (10043)             Protocol not supported. 
+请求的协议没有在系统中配置或没有支持它的实现存在。例如，socket()调用请求一个SOCK_DGRAM套接字，但指定的是流协议。
+ 
+WSAEPROTOTYPE                (10041)             Protocol wrong type for socket. 
+在socket()函数调用中指定的协议不支持请求的套接字类型的语义。例如，ARPA Internet UDP协议不能和SOCK_STREAM套接字类型一同指定。
+ 
+WSAESHUTDOWN                 (10058)             Cannot send after socket shutdown. 
+因为套接字在相应方向上已经被先前的shutdown()调用关闭，因此该方向上的发送或接收请求不被允许。通过调用shutdown()函数来请求对套接字的部分关闭，它发送一个信号来停止发送或接收或双向操作。
+ 
+WSAESOCKTNOSUPPORT    (10044)             Socket type not supported. 
+不支持在此地址族中指定的套接字类型。例如，socket()调用中选择了可选的套接字类型SOCK_RAW，但是实现却根本不支持SOCK_RAW类型的套接字。
+ 
+WSAETIMEDOUT                   (10060)             Connection timed out. 
+连接请求因被连接方在一个时间周期内不能正确响应而失败，或已经建立的连接因被连接的主机不能响应而失败。
+ 
+WSATYPE_NOT_FOUND        (10109)             Class type not found 
+     指定的类没有找到。
+ 
+WSAEWOULDBLOCK           (10035)             Resource temporarily unavailable. 
+此错误由在非阻塞套接字上不能立即完成的操作返回，例如，当套接字上没有排队数据可读时调用了recv()函数。此错误不是严重错误，相应操作应该稍后重试。对于在非阻塞SOCK_STREAM套接字上调用connect()函数来说，报告WSAEWOULDBLOCK是正常的，因为建立一个连接必须花费一些时间。
+ 
+WSAHOST_NOT_FOUND        (11001)             Host not found.
+主机未知。此名字不是一个正式主机名，也不是一个别名，它不能在查询的数据库中找到。此错误也可能在协议和服务查询中返回，它意味着指定的名字不能在相关数据库中找到。
+ 
+WSA_INVALID_HANDLE        (OS dependent) Specified event object handle is invalid.
+应用程序试图使用一个事件对象，但指定的句柄非法。
+ 
+WSA_INVALID_PARAMETER (OS dependent) One or more parameters are invalid.
+应用程序使用了一个直接映射到Win32函数的WinSock函数，而Win32函数指示一个或多个参数有问题。
+ 
+WSAINVALIDPROCTABLE    (OS dependent)      Invalid procedure table from service provider.
+服务提供者返回了一个假的WS2_32.DLL程序（procedure）表。这通常是由一个或多个函数指针为空引起。
+ 
+WSAINVALIDPROVIDER        (OS dependent)      Invalid service provider version number.
+     服务提供者返回一个不同于2.2的版本号。
+ 
+WSA_IO_INCOMPLETE         (OS dependent) Overlapped I/O event object not in signaled state.
+应用程序试图检测一个没有完成的重叠操作的状态。应用程序使用函数WSAGetOverlappedResult()（参数fWait设置为false）以轮询模式检测一个重叠操作是否完成时将得到此错误码，除非该操作已经完成。
+ 
+WSA_IO_PENDING                 (OS dependent) Overlapped operations will complete later.
+应用程序已经初始化了一个不能立即完成的重叠操作。当稍后此操作完成时将有完成指示。
+ 
+WSA_NOT_ENOUGH_MEMORY  (OS dependent)       Insufficient memory available.
+应用程序使用了一个直接映射到Win32函数的WinSock函数，而Win32函数指示缺乏必要的内存资源。
+ 
+WSANOTINITIALISED           (10093)             Successful WSAStartup() not yet performed.
+应用程序没有调用WSAStartup()函数，或函数WSAStartup()调用失败了。应用程序可能访问了不属于当前活动任务的套接字（例如试图在任务间共享套接字），或调用了过多的WSACleanup()函数。
+ 
+WSANO_DATA                        (11004)             Valid name, no data record of requested type.
+请求的名字合法并且在数据库中找到了，但它没有正确的关联数据用于解析。此错误的通常例子是主机名到地址（使用gethostbyname()或WSAAsyncGetHostByName()函数）的DNS转换请求，返回了MX（Mail eXchanger）记录但是没有A（Address）记录，它指示主机本身是存在的，但是不能直接到达。
+ 
+WSANO_RECOVERY              (11003)             This is a non-recoverable error.
+此错误码指示在数据库查找时发生了某种不可恢复错误。它可能是因为数据库文件（如BSD兼容的HOSTS、SERVICES或PROTOCOLS文件）找不到，或DNS请求应服务器有严重错误而返回。
+ 
+WSAPROVIDERFAILEDINIT  (OS dependent)      Unable to initialize a service provider.
+服务提供者的DLL不能加载（LoadLibrary()失败）或提供者的WSPStartup/NSPStartup函数失败。
+ 
+WSASYSCALLFAILURE         (OS dependent)      System call failure..
+当一个不应该失败的系统调用失败时返回。例如，如果WaitForMultipleObjects()调用失败，或注册的API不能够利用协议／名字空间目录。
+ 
+WSASYSNOTREADY              (10091)             Network subsystem is unavailable. 
+此错误由WSAStartup()函数返回，它表示此时Windows Sockets实现因底层用来提供网络服务的系统不可用。用户应该检查：
+    是否有合适的Windows Sockets DLL文件在当前路径中。
+    是否同时使用了多个WinSock实现。如果有多于一个的WINSOCK DLL在系统中，必须确保搜索路径中第一个WINSOCK DLL文件是当前加载的网络子系统所需要的。
+    查看WinSock实现的文档以确保所有必须的部件都正确地安装并配置好了。
+ 
+WSATRY_AGAIN                    (11002)             Non-authoritative host not found.
+此错误通常是在主机名解析时的临时错误，它意味着本地服务器没有从授权服务器接收到一个响应。稍后的重试可能会获得成功。
+ 
+WSAVERNOTSUPPORTED     (10092)             WINSOCK.DLL version out of range.
+当前的WinSock实现不支持应用程序指定的Windows Sockets规范版本。检查是否有旧的Windows Sockets DLL文件正在被访问。
+ 
+WSAEDISCON                        (10101)             Graceful shutdown in progress.
+由WSARecv()和WSARecvFrom()函数返回，指示远程方已经初始化了一个“雅致”的关闭序列。
+ 
+WSA_OPERATION_ABORTED   (OS dependent) Overlapped operation aborted.
+     因为套接字的关闭，一个重叠操作被取消，或是执行了WSAIoctl()函数的SIO_FLUSH命令。
+以下英文解释来自MSDN:
+Error Codes
+The following is a list of possible error codes returned by the WSAGetLastError call, along with their extended explanations. Errors are listed in alphabetical order by error macro. Some error codes defined in WINSOCK2.H are not returned from any function - these have not been listed here.
+
+WSAEACCES 
+(10013) 
+Permission denied. 
+An attempt was made to access a socket in a way forbidden by its access permissions. An example is using a broadcast address for sendto without broadcast permission being set using setsockopt(SO_BROADCAST). 
+WSAEADDRINUSE 
+(10048) 
+Address already in use. 
+Only one usage of each socket address (protocol/IP address/port) is normally permitted. This error occurs if an application attempts to bind a socket to an IP address/port that has already been used for an existing socket, or a socket that wasn't closed properly, or one that is still in the process of closing. For server applications that need to bind multiple sockets to the same port number, consider using setsockopt(SO_REUSEADDR). Client applications usually need not call bind at all - connect will choose an unused port automatically. When bind is called with a wild-card address (involving ADDR_ANY), a WSAEADDRINUSE error could be delayed until the specific address is "committed." This could happen with a call to other function later, including connect, listen, WSAConnect or WSAJoinLeaf. 
+WSAEADDRNOTAVAIL 
+(10049) 
+Cannot assign requested address. 
+The requested address is not valid in its context. Normally results from an attempt to bind to an address that is not valid for the local machine. This can also result from connect, sendto, WSAConnect, WSAJoinLeaf, or WSASendTo when the remote address or port is not valid for a remote machine (e.g. address or port 0). 
+WSAEAFNOSUPPORT 
+(10047) 
+Address family not supported by protocol family. 
+An address incompatible with the requested protocol was used. All sockets are created with an associated "address family" (i.e. AF_INET for Internet Protocols) and a generic protocol type (i.e. SOCK_STREAM). This error will be returned if an incorrect protocol is explicitly requested in the socket call, or if an address of the wrong family is used for a socket, e.g. in sendto. 
+WSAEALREADY 
+(10037) 
+Operation already in progress. 
+An operation was attempted on a non-blocking socket that already had an operation in progress - i.e. calling connect a second time on a non-blocking socket that is already connecting, or canceling an asynchronous request (WSAAsyncGetXbyY) that has already been canceled or completed. 
+WSAECONNABORTED 
+(10053) 
+Software caused connection abort. 
+An established connection was aborted by the software in your host machine, possibly due to a data transmission timeout or protocol error. 
+WSAECONNREFUSED 
+(10061) 
+Connection refused. 
+No connection could be made because the target machine actively refused it. This usually results from trying to connect to a service that is inactive on the foreign host - i.e. one with no server application running. 
+WSAECONNRESET 
+(10054) 
+Connection reset by peer. 
+A existing connection was forcibly closed by the remote host. This normally results if the peer application on the remote host is suddenly stopped, the host is rebooted, or the remote host used a "hard close" (see setsockopt for more information on the SO_LINGER option on the remote socket.) This error may also result if a connection was broken due to "keep-alive" activity detecting a failure while one or more operations are in progress. Operations that were in progress fail with WSAENETRESET. Subsequent operations fail with WSAECONNRESET. 
+WSAEDESTADDRREQ 
+(10039) 
+Destination address required. 
+A required address was omitted from an operation on a socket. For example, this error will be returned if sendto is called with the remote address of ADDR_ANY. 
+WSAEFAULT 
+(10014) 
+Bad address. 
+The system detected an invalid pointer address in attempting to use a pointer argument of a call. This error occurs if an application passes an invalid pointer value, or if the length of the buffer is too small. For instance, if the length of an argument which is a struct sockaddr is smaller than sizeof(struct sockaddr). 
+WSAEHOSTDOWN 
+(10064) 
+Host is down. 
+A socket operation failed because the destination host was down. A socket operation encountered a dead host. Networking activity on the local host has not been initiated. These conditions are more likely to be indicated by the error WSAETIMEDOUT. 
+WSAEHOSTUNREACH 
+(10065) 
+No route to host. 
+A socket operation was attempted to an unreachable host. See WSAENETUNREACH 
+WSAEINPROGRESS 
+(10036) 
+Operation now in progress. 
+A blocking operation is currently executing. Windows Sockets only allows a single blocking operation to be outstanding per task (or thread), and if any other function call is made (whether or not it references that or any other socket) the function fails with the WSAEINPROGRESS error. 
+WSAEINTR 
+(10004) 
+Interrupted function call. 
+A blocking operation was interrupted by a call to WSACancelBlockingCall. 
+WSAEINVAL 
+(10022) 
+Invalid argument. 
+Some invalid argument was supplied (for example, specifying an invalid level to the setsockopt function). In some instances, it also refers to the current state of the socket - for instance, calling accept on a socket that is not listening. 
+WSAEISCONN 
+(10056) 
+Socket is already connected. 
+A connect request was made on an already connected socket. Some implementations also return this error if sendto is called on a connected SOCK_DGRAM socket (For SOCK_STREAM sockets, the to parameter in sendto is ignored), although other implementations treat this as a legal occurrence. 
+WSAEMFILE 
+(10024) 
+Too many open files. 
+Too many open sockets. Each implementation may have a maximum number of socket handles available, either globally, per process or per thread. 
+WSAEMSGSIZE 
+(10040) 
+Message too long. 
+A message sent on a datagram socket was larger than the internal message buffer or some other network limit, or the buffer used to receive a datagram into was smaller than the datagram itself. 
+WSAENETDOWN 
+(10050) 
+Network is down. 
+A socket operation encountered a dead network. This could indicate a serious failure of the network system (i.e. the protocol stack that the WinSock DLL runs over), the network interface, or the local network itself. 
+WSAENETRESET 
+(10052) 
+Network dropped connection on reset. 
+The connection has been broken due to "keep-alive" activity detecting a failure while the operation was in progress. It can also be returned by setsockopt if an attempt is made to set SO_KEEPALIVE on a connection that has already failed. 
+WSAENETUNREACH 
+(10051) 
+Network is unreachable. 
+A socket operation was attempted to an unreachable network. This usually means the local software knows no route to reach the remote host. 
+WSAENOBUFS 
+(10055) 
+No buffer space available. 
+An operation on a socket could not be performed because the system lacked sufficient buffer space or because a queue was full. 
+WSAENOPROTOOPT 
+(10042) 
+Bad protocol option. 
+An unknown, invalid or unsupported option or level was specified in a getsockopt or setsockopt call. 
+WSAENOTCONN 
+(10057) 
+Socket is not connected. 
+A request to send or receive data was disallowed because the socket is not connected and (when sending on a datagram socket using sendto) no address was supplied. Any other type of operation might also return this error - for example, setsockopt setting SO_KEEPALIVE if the connection has been reset. 
+WSAENOTSOCK 
+(10038) 
+Socket operation on non-socket. 
+An operation was attempted on something that is not a socket. Either the socket handle parameter did not reference a valid socket, or for select, a member of an fd_set was not valid. 
+WSAEOPNOTSUPP 
+(10045) 
+Operation not supported. 
+The attempted operation is not supported for the type of object referenced. Usually this occurs when a socket descriptor to a socket that cannot support this operation, for example, trying to accept a connection on a datagram socket. 
+WSAEPFNOSUPPORT 
+(10046) 
+Protocol family not supported. 
+The protocol family has not been configured into the system or no implementation for it exists. Has a slightly different meaning to WSAEAFNOSUPPORT, but is interchangeable in most cases, and all Windows Sockets functions that return one of these specify WSAEAFNOSUPPORT. 
+WSAEPROCLIM 
+(10067) 
+Too many processes. 
+A Windows Sockets implementation may have a limit on the number of applications that may use it simultaneously. WSAStartup may fail with this error if the limit has been reached. 
+WSAEPROTONOSUPPORT 
+(10043) 
+Protocol not supported. 
+The requested protocol has not been configured into the system, or no implementation for it exists. For example, a socket call requests a SOCK_DGRAM socket, but specifies a stream protocol. 
+WSAEPROTOTYPE 
+(10041) 
+Protocol wrong type for socket. 
+A protocol was specified in the socket function call that does not support the semantics of the socket type requested. For example, the ARPA Internet UDP protocol cannot be specified with a socket type of SOCK_STREAM. 
+WSAESHUTDOWN 
+(10058) 
+Cannot send after socket shutdown. 
+A request to send or receive data was disallowed because the socket had already been shut down in that direction with a previous shutdown call. By calling shutdown a partial close of a socket is requested, which is a signal that sending or receiving or both has been discontinued. 
+WSAESOCKTNOSUPPORT 
+(10044) 
+Socket type not supported. 
+The support for the specified socket type does not exist in this address family. For example, the optional type SOCK_RAW might be selected in a socket call, and the implementation does not support SOCK_RAW sockets at all. 
+WSAETIMEDOUT 
+(10060) 
+Connection timed out. 
+A connection attempt failed because the connected party did not properly respond after a period of time, or established connection failed because connected host has failed to respond. 
+WSATYPE_NOT_FOUND 
+(10109) 
+Class type not found. 
+The specified class was not found. 
+WSAEWOULDBLOCK 
+(10035) 
+Resource temporarily unavailable. 
+This error is returned from operations on non-blocking sockets that cannot be completed immediately, for example recv when no data is queued to be read from the socket. It is a non-fatal error, and the operation should be retried later. It is normal for WSAEWOULDBLOCK to be reported as the result from calling connect on a non-blocking SOCK_STREAM socket, since some time must elapse for the connection to be established. 
+WSAHOST_NOT_FOUND 
+(11001) 
+Host not found. 
+No such host is known. The name is not an official hostname or alias, or it cannot be found in the database(s) being queried. This error may also be returned for protocol and service queries, and means the specified name could not be found in the relevant database. 
+WSA_INVALID_HANDLE 
+(OS dependent) 
+Specified event object handle is invalid. 
+An application attempts to use an event object, but the specified handle is not valid. 
+WSA_INVALID_PARAMETER 
+(OS dependent) 
+One or more parameters are invalid. 
+An application used a Windows Sockets function which directly maps to a Win32 function. The Win32 function is indicating a problem with one or more parameters. 
+WSAINVALIDPROCTABLE 
+(OS dependent) 
+Invalid procedure table from service provider. 
+A service provider returned a bogus proc table to WS2_32.DLL. (Usually caused by one or more of the function pointers being NULL.) 
+WSAINVALIDPROVIDER 
+(OS dependent) 
+Invalid service provider version number. 
+A service provider returned a version number other than 2.0. 
+WSA_IO_INCOMPLETE 
+(OS dependent) 
+Overlapped I/O event object not in signaled state. 
+The application has tried to determine the status of an overlapped operation which is not yet completed. Applications that use WSAGetOverlappedResult (with the fWait flag set to false) in a polling mode to determine when an overlapped operation has completed will get this error code until the operation is complete. 
+WSA_IO_PENDING 
+(OS dependent) 
+Overlapped operations will complete later. 
+The application has initiated an overlapped operation which cannot be completed immediately. A completion indication will be given at a later time when the operation has been completed. 
+WSA_NOT_ENOUGH_MEMORY 
+(OS dependent) 
+Insufficient memory available. 
+An application used a Windows Sockets function which directly maps to a Win32 function. The Win32 function is indicating a lack of required memory resources. 
+WSANOTINITIALISED 
+(10093) 
+Successful WSAStartup not yet performed. 
+Either the application hasn't called WSAStartup or WSAStartup failed. The application may be accessing a socket which the current active task does not own (i.e. trying to share a socket between tasks), or WSACleanup has been called too many times. 
+WSANO_DATA 
+(11004) 
+Valid name, no data record of requested type. 
+The requested name is valid and was found in the database, but it does not have the correct associated data being resolved for. The usual example for this is a hostname -> address translation attempt (using gethostbyname or WSAAsyncGetHostByName) which uses the DNS (Domain Name Server), and an MX record is returned but no A record - indicating the host itself exists, but is not directly reachable. 
+WSANO_RECOVERY 
+(11003) 
+This is a non-recoverable error. 
+This indicates some sort of non-recoverable error occurred during a database lookup. This may be because the database files (e.g. BSD-compatible HOSTS, SERVICES or PROTOCOLS files) could not be found, or a DNS request was returned by the server with a severe error. 
+WSAPROVIDERFAILEDINIT 
+(OS dependent) 
+Unable to initialize a service provider. 
+Either a service provider's DLL could not be loaded (LoadLibrary failed) or the provider's WSPStartup/NSPStartup function failed. 
+WSASYSCALLFAILURE 
+(OS dependent) 
+System call failure. 
+Returned when a system call that should never fail does. For example, if a call to WaitForMultipleObjects fails or one of the registry functions fails trying to manipulate theprotocol/namespace catalogs. 
+WSASYSNOTREADY 
+(10091) 
+Network subsystem is unavailable. 
+This error is returned by WSAStartup if the Windows Sockets implementation cannot function at this time because the underlying system it uses to provide network services is currently unavailable. Users should check: 
+that the appropriate Windows Sockets DLL file is in the current path, 
+that they are not trying to use more than one Windows Sockets implementation simultaneously. If there is more than one WINSOCK DLL on your system, be sure the first one in the path is appropriate for the network subsystem currently loaded. 
+the Windows Sockets implementation documentation to be sure all necessary components are currently installed and configured correctly. 
+WSATRY_AGAIN 
+(11002) 
+Non-authoritative host not found. 
+This is usually a temporary error during hostname resolution and means that the local server did not receive a response from an authoritative server. A retry at some time later may be successful. 
+WSAVERNOTSUPPORTED 
+(10092) 
+WINSOCK.DLL version out of range. 
+The current Windows Sockets implementation does not support the Windows Sockets specification version requested by the application. Check that no old Windows Sockets DLL files are being accessed. 
+WSAEDISCON 
+(10094) 
+Graceful shutdown in progress. 
+Returned by WSARecv and WSARecvFrom to indicate the remote party has initiated a graceful shutdown sequence. 
+WSA_OPERATION_ABORTED 
+(OS dependent) 
+Overlapped operation aborted. 
+An overlapped operation was canceled due to the closure of the socket, or the execution of the SIO_FLUSH command in WSAIoctl. 

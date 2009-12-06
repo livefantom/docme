@@ -1,0 +1,130 @@
+Oracle中Decode()函数使用技巧
+作者: 网络收集, 　出处:IT 专家网,　责任编辑: ttdb,　2005-08-10 08:31
+
+DECODE函数是ORACLE PL/SQL是功能强大的函数之一，目前还只有ORACLE公司的SQL提供了此函数，其他数据库厂商的SQL实现还没有此功能。DECODE有什么用途呢？ 先构造一个例子，假设我们想给智星职员加工资，其标准是：工资在8000元以下的将加20％；工资在8000元以上的加15％，通常的做法是，先选出记录中的工资字段值? select salary into var-salary from employee，然后对变量var-salary用if-then-else或choose case之类的流控制语句进行判断。 如果用DECODE函数，那么我们就可以把这些流控制语句省略，通过SQL语句就可以直接完成。如下：select decode(sign(salary - 8000),1,salary*1.15,-1,salary*1.2,salary from employee 是不是很简洁？ DECODE的语法：DECODE(value,if1,then1,if2,then2,if3,then3,...,else)，表示如果value等于if1时，DECODE函数的结果返回then1,...,如果不等于任何一个if值，则返回else。初看一下，DECODE 只能做等于测试，但刚才也看到了，我们通过一些函数或计算替代value，是可以使DECODE函数具备大于、小于或等于功能。
+
+decode()函数使用技巧
+
+·软件环境:
+
+1、Windows NT4.0+ORACLE 8.0.4
+
+2、ORACLE安装路径为:C:\ORANT
+
+·含义解释:
+
+decode(条件,值1,翻译值1,值2,翻译值2,...值n,翻译值n,缺省值)
+
+该函数的含义如下:
+
+IF 条件=值1 THEN
+
+RETURN(翻译值1)
+
+ELSIF 条件=值2 THEN
+
+RETURN(翻译值2)
+
+......
+
+ELSIF 条件=值n THEN
+
+RETURN(翻译值n)
+
+ELSE
+
+RETURN(缺省值)
+
+END IF
+
+· 使用方法:
+
+1、比较大小
+
+select decode(sign(变量1-变量2),-1,变量1,变量2) from dual; --取较小值
+
+sign()函数根据某个值是0、正数还是负数，分别返回0、1、-1
+
+例如:
+
+变量1=10，变量2=20
+
+则sign(变量1-变量2)返回-1，decode解码结果为“变量1”，达到了取较小值的目的。
+
+2、表、视图结构转化
+
+现有一个商品销售表sale，表结构为:
+
+month　　　 char(6)　　　　　 --月份
+
+sell　　　　number(10,2)　　　--月销售金额
+
+现有数据为:
+
+200001　　1000
+
+200002　　1100
+
+200003　　1200
+
+200004　　1300
+
+200005　　1400
+
+200006　　1500
+
+200007　　1600
+
+200101　　1100
+
+200202　　1200
+
+200301　　1300
+
+想要转化为以下结构的数据:
+
+year　　　char(4)　　　　　 --年份
+
+month1　　number(10,2)　　　--1月销售金额
+
+month2　　number(10,2)　　　--2月销售金额
+
+month3　　number(10,2)　　　--3月销售金额
+
+month4　　number(10,2)　　　--4月销售金额
+
+month5　　number(10,2)　　　--5月销售金额
+
+month6　　number(10,2)　　　--6月销售金额
+
+month7　　number(10,2)　　　--7月销售金额
+
+month8　　number(10,2)　　　--8月销售金额
+
+month9　　number(10,2)　　　--9月销售金额
+
+month10　　number(10,2)　　　--10月销售金额
+
+month11　　number(10,2)　　　--11月销售金额
+
+month12　　number(10,2)　　　--12月销售金额
+
+结构转化的SQL语句为:
+
+create or replace view
+
+v_sale(year,month1,month2,month3,month4,month5,month6,month7,month8,month9,month10,month11,month12)
+
+as
+
+select
+
+substrb(month,1,4),
+
+sum(decode(substrb(month,5,2),'01',sell,0)),
+
+sum(decode(substrb(month,5,2),'02',sell,0)),
+
+sum(decode(substrb(month,5,2),'03',sell,0)),
+
+sum(decode(substrb(month,5,2),'04',sell,0)),

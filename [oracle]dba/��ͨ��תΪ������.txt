@@ -1,0 +1,127 @@
+将普通表转变为分区表 
+=========================================================== 
+作者: yangtingkun(http://yangtingkun.itpub.net)
+发表于: 2005.01.07 15:20
+分类: ORACLE 
+出处: http://yangtingkun.itpub.net/post/468/13091
+--------------------------------------------------------------- 
+
+Oracle的普通表没有办法通过修改属性的方式直接转化为分区表，必须通过重建的方式进行转变，
+下面介绍三种效率比较高的方法，并说明它们各自的特点。
+ 
+
+
+方法一：利用原表重建分区表。
+步骤：
+SQL> CREATE TABLE T (ID NUMBER PRIMARY KEY, TIME DATE);
+表已创建。
+SQL> INSERT INTO T SELECT ROWNUM, CREATED FROM DBA_OBJECTS;
+已创建6264行。
+SQL> COMMIT;
+提交完成。
+
+SQL> CREATE TABLE T_NEW (ID, TIME) PARTITION BY RANGE (TIME) 
+  2  (PARTITION P1 VALUES LESS THAN (TO_DATE('2004-7-1', 'YYYY-MM-DD')), 
+  3  PARTITION P2 VALUES LESS THAN (TO_DATE('2005-1-1', 'YYYY-MM-DD')), 
+  4  PARTITION P3 VALUES LESS THAN (TO_DATE('2005-7-1', 'YYYY-MM-DD')), 
+  5  PARTITION P4 VALUES LESS THAN (MAXVALUE))
+  6  AS SELECT ID, TIME FROM T;
+表已创建。
+SQL> RENAME T TO T_OLD;
+表已重命名。
+SQL> RENAME T_NEW TO T;
+表已重命名。
+SQL> SELECT COUNT(*) FROM T;
+  COUNT(*)
+----------
+      6264
+SQL> SELECT COUNT(*) FROM T PARTITION (P1);
+  COUNT(*)
+----------
+         0
+SQL> SELECT COUNT(*) FROM T PARTITION (P2);
+  COUNT(*)
+----------
+      6246
+SQL> SELECT COUNT(*) FROM T PARTITION (P3);
+  COUNT(*)
+----------
+        18
+优点：方法简单易用，由于采用DDL语句，不会产生UNDO，且只产生少量REDO，效率相对较高，而
+且建表完成后数据已经在分布到各个分区中了。
+不足：对于数据的一致性方面还需要额外的考虑。由于几乎没有办法通过手工锁定T表的方式保证
+一致性，在执行CREATE TABLE语句和RENAME T_NEW TO T语句直接的修改可能会丢失，如果要保证
+一致性，需要在执行完语句后对数据进行检查，而这个代价是比较大的。另外在执行两个RENAME
+语句之间执行的对T的访问会失败。
+适用于修改不频繁的表，在闲时进行操作，表的数据量不宜太大。
+ 
+方法二：使用交换分区的方法。
+步骤：
+SQL> CREATE TABLE T (ID NUMBER PRIMARY KEY, TIME DATE);
+表已创建。
+SQL> INSERT INTO T SELECT ROWNUM, CREATED FROM DBA_OBJECTS;
+已创建6264行。
+SQL> COMMIT;
+提交完成。
+SQL> CREATE TABLE T_NEW (ID NUMBER PRIMARY KEY, TIME DATE) PARTITION BY RANGE (TIME) 
+  2  (PARTITION P1 VALUES LESS THAN (TO_DATE('2005-7-1', 'YYYY-MM-DD')), 
+  3  PARTITION P2 VALUES LESS THAN (MAXVALUE));
+表已创建。
+SQL> ALTER TABLE T_NEW EXCHANGE PARTITION P1 WITH TABLE T;
+表已更改。
+SQL> RENAME T TO T_OLD;
+表已重命名。
+SQL> RENAME T_NEW TO T;
+表已重命名。
+SQL> SELECT COUNT(*) FROM T;
+  COUNT(*)
+----------
+      6264
+优点：只是对数据字典中分区和表的定义进行了修改，没有数据的修改或复制，效率最高。如果
+对数据在分区中的分布没有进一步要求的话，实现比较简单。在执行完RENAME操作后，可以检查
+T_OLD中是否存在数据，如果存在的话，直接将这些数据插入到T中，可以保证对T插入的操作不会
+丢失。
+不足：仍然存在一致性问题，交换分区之后RENAME T_NEW TO T之前，查询、更新和删除会出现错
+误或访问不到数据。如果要求数据分布到多个分区中，则需要进行分区的SPLIT操作，会增加操作
+的复杂度，效率也会降低。
+适用于包含大数据量的表转到分区表中的一个分区的操作。应尽量在闲时进行操作。
+ 
+方法三：Oracle9i以上版本，利用在线重定义功能
+步骤：
+SQL> CREATE TABLE T (ID NUMBER PRIMARY KEY, TIME DATE);
+表已创建。
+SQL> INSERT INTO T SELECT ROWNUM, CREATED FROM DBA_OBJECTS;
+已创建6264行。
+SQL> COMMIT;
+提交完成。
+SQL> EXEC DBMS_REDEFINITION.CAN_REDEF_TABLE(USER, 'T', DBMS_REDEFINITION.CONS_USE_PK);
+PL/SQL 过程已成功完成。
+SQL> CREATE TABLE T_NEW (ID NUMBER PRIMARY KEY, TIME DATE) PARTITION BY RANGE (TIME) 
+  2  (PARTITION P1 VALUES LESS THAN (TO_DATE('2004-7-1', 'YYYY-MM-DD')), 
+  3  PARTITION P2 VALUES LESS THAN (TO_DATE('2005-1-1', 'YYYY-MM-DD')), 
+  4  PARTITION P3 VALUES LESS THAN (TO_DATE('2005-7-1', 'YYYY-MM-DD')), 
+  5  PARTITION P4 VALUES LESS THAN (MAXVALUE));
+表已创建。
+SQL> EXEC DBMS_REDEFINITION.START_REDEF_TABLE(USER, 'T', 'T_NEW', -
+> 'ID ID, TIME TIME', DBMS_REDEFINITION.CONS_USE_PK);
+PL/SQL 过程已成功完成。
+SQL> EXEC DBMS_REDEFINITION.FINISH_REDEF_TABLE('YANGTK', 'T', 'T_NEW');
+PL/SQL 过程已成功完成。
+SQL> SELECT COUNT(*) FROM T;
+  COUNT(*)
+----------
+      6264
+SQL> SELECT COUNT(*) FROM T PARTITION (P2);
+  COUNT(*)
+----------
+      6246
+SQL> SELECT COUNT(*) FROM T PARTITION (P3);
+  COUNT(*)
+----------
+        18
+优点：保证数据的一致性，在大部分时间内，表T都可以正常进行DML操作。只在切换的瞬间锁表，
+具有很高的可用性。这种方法具有很强的灵活性，对各种不同的需要都能满足。而且，可以在切
+换前进行相应的授权并建立各种约束，可以做到切换完成后不再需要任何额外的管理操作。
+不足：实现上比上面两种略显复杂。
+适用于各种情况。
+

@@ -1,0 +1,390 @@
+ORACLE索引介绍与高性能SQL优化
+
+
+什么是索引
+
+索引是建立在表的一列或多个列上的辅助对象，目的是加快访问表中的数据；
+
+Oracle存储索引的数据结构是B*树，位图索引也是如此，只不过是叶子节点不同B*数索引；
+
+索引由根节点、分支节点和叶子节点组成，上级索引块包含下级索引块的索引数据，叶节点包含索引数据和确定行实际位置的rowid。
+
+使用索引的目的
+加快查询速度
+减少I/O操作
+消除磁盘排序
+
+何时使用索引
+查询返回的记录数
+排序表<40%
+非排序表 <7%
+表的碎片较多（频繁增加、删除）
+
+索引的种类
+非唯一索引（最常用）
+唯一索引
+位图索引
+局部有前缀分区索引
+局部无前缀分区索引
+全局有前缀分区索引
+散列分区索引
+基于函数的索引
+
+管理索引的准则
+
+在表中插入数据后创建索引
+
+。在用SQL*Loader或import工具插入或装载数据后，建立索引比较有效；
+
+索引正确的表和列
+
+。经常检索排序大表中40%或非排序表7%的行，建议建索引；
+。为了改善多表关联，索引列用于联结；
+。列中的值相对比较唯一；
+。取值范围（大：B*树索引，小：位图索引）；
+。Date型列一般适合基于函数的索引；
+。列中有许多空值，不适合建立索引
+
+为性能而安排索引列
+
+。经常一起使用多个字段检索记录，组合索引比单索引更有效；
+。把最常用的列放在最前面，例：dx_groupid_serv_id(groupid,serv_id)，在where条件中使用groupid或groupid,serv_id，查询将使用索引，若仅用到serv_id字段，则索引无效；
+。合并/拆分不必要的索引。
+
+限制每个表索引的数量
+
+。一个表可以有几百个索引（你会这样做吗？），但是对于频繁插入和更新表，索引越多系统CPU，I/O负担就越重；
+。建议每张表不超过5个索引。
+
+删除不再需要的索引
+
+。索引无效，集中表现在该使用基于函数的索引或位图索引，而使用了B*树索引；
+。应用中的查询不使用索引；
+。重建索引之前必须先删除索引，若用alter index … rebuild重建索引，则不必删除索引。
+
+索引数据块空间使用
+
+。创建索引时指定表空间，特别是在建立主键时，应明确指定表空间；
+。合理设定pctfress，注意：不能给索引指定pctused；
+。估计索引的大小和合理地设置存储参数，默认为表空间大小，或initial与next设置成一样大。
+
+考虑并行创建索引
+
+。对大表可以采用并行创建索引，在并行创建索引时，存储参数被每个查询服务器进程分别使用，例如：initial为1M，并行度为8，则创建索引期间至少要消耗8M空间；
+
+考虑用nologging创建索引
+
+。对大表创建索引可以使用nologging来减少重做日志；
+。节省重做日志文件的空间；
+。缩短创建索引的时间；
+。改善了并行创建大索引时的性能。 
+
+
+怎样建立最佳索引
+
+明确地创建索引
+create index index_name on table_name(field_name)
+tablespace tablespace_name
+pctfree 5
+initrans 2
+maxtrans 255
+storage
+(
+minextents 1
+maxextents 16382
+pctincrease 0
+);
+
+创建基于函数的索引
+
+。常用与UPPER、LOWER、TO_CHAR(date)等函数分类上，例：
+create index idx_func on emp (UPPER(ename)) tablespace tablespace_name;
+
+创建位图索引
+
+。对基数较小，且基数相对稳定的列建立索引时，首先应该考虑位图索引，例：
+create bitmap index idx_bitm on class (classno) tablespace tablespace_name;
+
+明确地创建唯一索引
+
+。可以用create unique index语句来创建唯一索引，例：
+create unique index dept_unique_idx on dept(dept_no) tablespace idx_1;
+
+创建与约束相关的索引
+
+。可以用using index字句，为与unique和primary key约束相关的索引，例如：
+alter table table_name
+add constraint PK_primary_keyname primary key (field_name)
+using index tablespace tablespace_name；
+
+如何创建局部分区索引
+
+。基础表必须是分区表；
+。分区数量与基础表相同；
+。每个索引分区的子分区数量与相应的基础表分区相同；
+。基础表的子分区中的行的索引项，被存储在该索引的相应的子分区中,例如:
+Create Index TG_CDR04_SERV_ID_IDX On TG_CDR04(SERV_ID)
+Pctfree 5
+Tablespace TBS_AK01_IDX
+Storage (
+MaxExtents 32768
+PctIncrease 0
+FreeLists 1
+FreeList Groups 1
+)
+local
+/
+
+如何创建范围分区的全局索引
+
+。基础表可以是全局表和分区表。
+create index idx_start_date on tg_cdr01(start_date)
+global partition by range(start_date)
+(partition p01_idx vlaues less than (‘0106’)
+partition p01_idx vlaues less than (‘0111’)
+…
+partition p01_idx vlaues less than (‘0401’ ))
+/
+
+重建现存的索引
+
+重建现存的索引的当前时刻不会影响查询；
+
+重建索引可以删除额外的数据块；
+
+提高索引查询效率；
+alter index idx_name rebuild nologging;
+
+对于分区索引：
+alter index idx_name rebuild partition partiton_name nologging;
+
+要删除索引的原因
+
+。不再需要的索引；
+。索引没有针对其相关的表所发布的查询提供所期望的性能改善；
+。应用没有用该索引来查询数据；
+。该索引无效，必须在重建之前删除该索引；
+。该索引已经变的太碎了，必须在重建之前删除该索引；
+。语句：drop index idx_name;drop index idx_name drop partition partition_name;
+
+建立索引的代价
+
+基础表维护时，系统要同时维护索引，不合理的索引将严重影响系统资源，主要表现在CPU和I/O上；
+
+插入、更新、删除数据产生大量db file sequential read锁等待； 
+
+SQL优化器简介
+
+基于规则的优化器
+
+。总是使用索引
+。总是从驱动表开始（from子句最右边的表）
+。只有在不可避免的情况下，才使用全表扫描
+。任何索引都可以
+
+基于成本的优化器
+
+。需要表、索引的统计资料
+Analyze table customer compute statistics;
+Analyze table customer estimate statistics sample 5000 rows;
+。表中设置并行度、表分区
+
+优化器模式
+
+rule模式
+
+。总忽略CBO和统计信息而基于规则
+choose模式
+
+。Oracle根据情况选择rule or first_rows or all_rows
+first_rows 模式
+
+。基于成本，以最快的速度返回记录，会造成总体查询速度的下降或消耗更多的资源，倾向索引扫描，适合OLTP系统
+all_rows模式
+
+。基于成本，确保总体查询时间最短，倾向并行全表扫描
+
+例如：
+Select last_name from customer order by last_name;用first_rows时，迅速返回记录，但I/O量大，用all_rows时，返回记录慢，但使用资源少。
+
+调整SQL表访问
+
+全表扫描
+
+。返回记录：未排序表>40%，排序表>7%，建议采用并行机制来提高访问速度，DDS；
+
+索引访问
+
+。最常用的方法，包括索引唯一扫描和索引范围扫描，OLTP；
+
+快速完全索引扫描
+
+。访问索引中所有数据块，结果相当于全表扫描，可以用索引扫描代替全表扫描，例如：
+
+Select serv_id,count(* ) from tg_cdr01 group by serv_id;
+
+评估全表扫描的合法性
+
+如何实现并行扫描
+
+。永久并行化（不推荐）
+alter table customer parallel degree 8;
+
+。单个查询并行化
+select /*+ full(emp) parallel(emp,8)*/ * from emp;
+
+分区表效果明显
+
+优化SQL语句排序
+
+排序的操作：
+
+。order by 子句
+。group by 子句
+。select distinct子句
+。创建索引时
+。union或minus
+。排序合并连接
+
+如何避免排序
+
+。添加索引
+。在索引中使用distinct子句
+。避免排序合并连接
+
+使用提示进行调整
+
+使用提示的原则
+
+。语法：/*+ hint */
+。使用表别名:select /*+ index(e dept_idx)*/ * from emp e
+。检验提示
+
+常用的提示
+
+。rule
+。all_rows
+。first_rows
+。use_nl
+。use_hash
+。use_merge
+。index
+。index_asc
+。no_index
+。index_desc（常用于使用max内置函数）
+。index_combine(强制使用位图索引)
+。index_ffs（索引快速完全扫描）
+。use_concat(将查询中所有or条件使用union all)
+。parallel
+。noparallel
+。full
+。ordered（基于成本）
+
+调整表连接
+
+表连接的类型
+
+。等连接
+where 条件中用等式连接；
+。外部连接（左、右连接）
+
+在where条件子句的等式谓词放置一个(+)来实现，例如：
+select a.ename,b.comm from emp a,bonus b where a.ename=b.ename(+);
+
+该语句返回所有emp表的记录；
+。自连接
+　Select a.value total, B.value hard, (A.value - b.value) soft ,
+Round((b.value/a.value)*100,1) perc
+From v$sysstat a,v$sysstat b
+Where a.statistic# = 179
+and B.statistic# = 180;
+
+反连接
+
+反连接常用于not in or not exists中，是指在查询中找到的任何记录都不包含在结果集中的子查询；不建议使用not in or not exists;
+
+。半连接
+
+查询中使用exists，含义：即使在子查询中返回多条重复的记录，外部查询也只返回一条记录。
+
+嵌套循环连接
+
+。被连接表中存在索引的情况下使用；
+。使用use_nl。
+
+hash连接
+
+。Hash连接将驱动表加载在内存中，并使用hash技术连接第二个表，提高等连接速度。
+。适合于大表和小表连接；
+。使用use_hash。
+
+排序合并连接
+
+。排序合并连接不使用索引
+。使用原则：
+
+连接表子段中不存在可用索引；
+
+查询返回两个表中大部分的数据快；
+
+CBO认为全表扫描比索引扫描执行的更快。
+
+。使用use_merge
+
+使用临时/中间表
+
+多个大表关联时，可以分别把满足条件的结果集存放到中间表，然后用中间表关联；
+
+SQL子查询的调整
+
+关联与非关联子查询
+
+。关联：子查询的内部引用的是外部表，每行执行一次；
+。非关联：子查询只执行一次，存放在内存中。
+
+调整not in 和not exists语句
+
+。可以使用外部连接优化not in子句，例如：
+select ename from emp where dept_no not in
+(select dept_no from dept where dept_name =‘Math’);
+
+改为：
+select ename from emp,dept
+where emp.dept_no=dept.dept_no
+and dept.dept_name is null;
+
+使用索引调整SQL
+
+Oracle 为什么不使用索引
+
+。检查被索引的列或组合索引的首列是否出现在PL/SQL语句的WHERE子句中，这是“执行计划”能用到相关索引的必要条件。
+
+。看采用了哪种类型的连接方式。ORACLE的共有Sort Merge Join（SMJ）、Hash Join（HJ）和Nested Loop Join（NL）。在两张表连接，且内表的目标列上建有索引时，只有Nested Loop才能有效地利用到该索引。SMJ即使相关列上建有索引，最多只能因索引的存在，避免数据排序过程。HJ由于须做HASH运算，索引的存在对数据查询速度几乎没有影响。
+
+。看连接顺序是否允许使用相关索引。假设表emp的deptno列上有索引，表dept的列deptno上无索引，WHERE语句有emp.deptno=dept.deptno条件。在做NL连接时，emp做为外表，先被访问，由于连接机制原因，外表的数据访问方式是全表扫描，emp.deptno上的索引显然是用不上，最多在其上做索引全扫描或索引快速全扫描。
+
+。是否用到系统数据字典表或视图。由于系统数据字典表都未被分析过，可能导致极差的“执行计划”。但是不要擅自对数据字典表做分析，否则可能导致死锁，或系统性能下降。
+
+。索引列是否函数的参数。如是，索引在查询时用不上。
+
+。是否存在潜在的数据类型转换。如将字符型数据与数值型数据比较，ORACLE会自动将字符型用to_number()函数进行转换，从而导致上一种现象的发生。
+
+。是否为表和相关的索引搜集足够的统计数据。对数据经常有增、删、改的表最好定期对表和索引进行分析，可用SQL语句“analyze table xxxx compute statistics for all indexes;”。ORACLE掌握了充分反映实际的统计数据，才有可能做出正确的选择。
+
+。索引列的选择性不高。 　　我们假设典型情况，有表emp，共有一百万行数据，但其中的emp.deptno列，数据只有4种不同的值，如10、20、30、40。虽然emp数据行有很多，ORACLE缺省认定表中列的值是在所有数据行均匀分布的，也就是说每种deptno值各有25万数据行与之对应。假设SQL搜索条件DEPTNO=10，利用deptno列上的索引进行数据搜索效率，往往不比全表扫描的高。
+
+。索引列值是否可为空（NULL）。如果索引列值可以是空值，在SQL语句中那些要返回NULL值的操作，将不会用到索引，如COUNT（*），而是用全表扫描。这是因为索引中存储值不能为全空。
+
+。看是否有用到并行查询（PQO）。并行查询将不会用到索引。
+
+。如果从以上几个方面都查不出原因的话，我们只好用采用在语句中加hint的方式强制ORACLE使用最优的“执行计划”。 　hint采用注释的方式，有行注释和段注释两种方式。 　如我们想要用到A表的IND_COL1索引的话，可采用以下方式： 　“SELECT /*+ INDEX（A IND_COL1）*/ * FROM A WHERE COL1 = XXX;"
+
+如何屏蔽索引
+
+语句的执行计划中有不良索引时，可以人为地屏蔽该索引，方法：
+
+。数值型：在索引字段上加0，例如
+select * from emp where emp_no+0 = v_emp_no;
+
+。字符型：在索引字段上加‘’，例如
+select * from tg_cdr01 where msisdn||’’=v_msisdn; 

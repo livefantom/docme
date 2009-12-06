@@ -1,0 +1,30 @@
+Remove the Scrollbar or the Border 
+To remove scrollbars or borders, use following method: 
+Follow the steps in Microsoft Knowledge Base article Q196835 and/or 236312 
+to provide the custom control site in which you can add the 
+IDocHostUIHandler interface. 
+
+
+196835 HOWTO: Override the MFC Default Control Containment 
+236312 HOWTO: Disable the Default Pop-up Menu for CHtmlView 
+
+
+After you implement all the functions, you must add DOCHOSTUIFLAG_SCROLL_NO 
+or DOCHOSTUIFLAG_NO3DBORDER to the DOCHOSTUIINFO stucture in the dwFlags 
+field for the GetHostInfo method. 
+
+
+HRESULT FAR EXPORT CCustomControlSite::XDocHostUIHandler::GetHostInfo( 
+DOCHOSTUIINFO* pInfo ) 
+{ 
+
+
+ METHOD_PROLOGUE(CCustomControlSite, DocHostUIHandler) 
+ pInfo->dwFlags = DOCHOSTUIFLAG_NO3DBORDER; 
+    pInfo->dwDoubleClick = DOCHOSTUIDBLCLK_DEFAULT; 
+
+
+    return S_OK; 
+} 
+for more information,see "WebBrowser Customization" in Internet Development 
+SDK. 

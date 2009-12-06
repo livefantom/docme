@@ -1,0 +1,194 @@
+Oracle的在线重定义表功能 
+=========================================================== 
+作者: yangtingkun(http://yangtingkun.itpub.net)
+发表于: 2005.01.05 18:28
+分类: ORACLE 
+出处: http://yangtingkun.itpub.net/post/468/12855
+--------------------------------------------------------------- 
+
+在一个高可用系统中，如果需要改变一个表的定义是一件比较棘手的问题，尤其是对于7×24系统。
+Oracle提供的基本语法基本可以满足一般性修改，但是对于把普通堆表改为分区表，把索引组织
+表修改为堆表等操作就无法完成了。而且，对于被大量DML语句访问的表，幸运的是，Oracle从9i
+版本开始提供了在线重定义表功能，通过调用DBMS_REDEFINITION包，可以在修改表结构的同时允
+许DML操作。
+
+
+在线重定义表具有以下功能：
+修改表的存储参数；
+可以将表转移到其他表空间；
+增加并行查询选项；
+增加或删除分区；
+重建表以减少碎片；
+将堆表改为索引组织表或相反的操作；
+增加或删除一个列。
+调用DBMS_REDEFINITION包需要EXECUTE_CATALOG_ROLE角色，除此之外，还需要CREATE ANY TABLE、
+ALTER ANY TABLE、DROP ANY TABLE、LOCK ANY TABLE和SELECT ANY TABLE的权限。
+在线重定义表的步骤如下：
+1.选择一种重定义方法：
+存在两种重定义方法，一种是基于主键、另一种是基于ROWID。ROWID的方式不能用于索引组织表，
+而且重定义后会存在隐藏列M_ROW$$。默认采用主键的方式。
+2.调用DBMS_REDEFINITION.CAN_REDEF_TABLE()过程，如果表不满足重定义的条件，将会报错并给
+出原因。
+3.在用一个方案中建立一个空的中间表，根据重定义后你期望得到的结构建立中间表。比如：采
+用分区表，增加了COLUMN等。
+4.调用DBMS_REDEFINITION.START_REDEF_TABLE()过程，并提供下列参数：被重定义的表的名称、
+中间表的名称、列的映射规则、重定义方法。
+如果映射方法没有提供，则认为所有包括在中间表中的列用于表的重定义。如果给出了映射方法，
+则只考虑映射方法中给出的列。如果没有给出重定义方法，则认为使用主键方式。
+5.在中间表上建立触发器、索引和约束，并进行相应的授权。任何包含中间表的完整性约束应将
+状态置为disabled。
+当重定义完成时，中间表上建立的触发器、索引、约束和授权将替换重定义表上的触发器、索引、
+约束和授权。中间表上disabled的约束将在重定义表上enable。
+6.（可选）如果在执行DBMS_REDEFINITION.START_REDEF_TABLE()过程和执行
+DBMS_REDEFINITION.FINISH_REDEF_TABLE()过程直接在重定义表上执行了大量的DML操作，那么可
+以选择执行一次或多次的SYNC_INTERIM_TABLE()过程，以减少最后一步执行FINISH_REDEF_TABLE()
+过程时的锁定时间。
+7.执行DBMS_REDEFINITION.FINISH_REDEF_TABLE()过程完成表的重定义。这个过程中，原始表会
+被独占模式锁定一小段时间，具体时间和表的数据量有关。
+执行完FINISH_REDEF_TABLE()过程后，原始表重定义后具有了中间表的属性、索引、约束、授权
+和触发器。中间表上disabled的约束在原始表上处于enabled状态。
+8.（可选）可以重命名索引、触发器和约束。对于采用了ROWID方式重定义的表，包括了一个隐含
+列M_ROW$$。推荐使用下列语句经隐含列置为UNUSED状态或删除。
+ALTER TABLE TABLE_NAME SET UNUSED (M_ROW$$);
+ALTER TABLE TABLE_NAME DROP UNUSED COLUMNS;
+下面是进行重定义操作后的结果：
+原始表根据中间表的属性和特性进行重定义；
+START_REDEF_TABLE()和FINISH_REDEF_TABLE()操作之间在中间表上建立的触发器、索引、约束和
+授权，现在定义在原始表上。中间表上disabled的约束在原始表上处于enabled状态。
+原始表上定义的触发器、索引、约束和授权建立在中间表上，并会在删除中间表时删除。原始表
+上原来enabled状态的索引，建立在中间表上，并处于disabled状态。
+任何定义在原始表上的存储过程和游标都会变为INVALID，当下次调用时后自动进行编译。
+如果执行过程中出现错误或者人为选择退出的话，可以执行DBMS_REDEFINITION.ABORT_REDEF_TABLE()
+过程。
+
+------------------------------------------------------------------------------------
+举个在线重定义使用的例子：
+ 
+
+
+SQL> create table test_primary (id number primary key);
+表已创建。
+SQL> insert into test_primary select rownum from dba_objects;
+已创建6264行。
+SQL> commit;
+提交完成。
+SQL> create table orgin_table (id number, fid number, name varchar2(30), create_date date) 
+  2  tablespace users;
+表已创建。
+SQL> insert into orgin_table select rownum, rownum, object_name, created from dba_objects 
+  2  where owner = 'SYS';
+已创建4034行。
+SQL> commit;
+提交完成。
+SQL> alter table orgin_table add constraint pk_orgin_table primary key (id);
+表已更改。
+SQL> create or replace trigger tr_orgin_table 
+  2  before insert on orgin_table for each row 
+  3  begin
+  4  null;
+  5  end;
+  6  /
+触发器已创建
+SQL> create index ind_orgin_table_create_date on orgin_table(create_date);
+索引已创建。
+SQL> alter table orgin_table add constraint f_orgin_primary_id foreign key (fid)
+  2  references test_primary (id);
+表已更改。
+SQL> begin
+  2  dbms_redefinition.can_redef_table('yangtk', 'orgin_table', dbms_redefinition.cons_use_pk);
+  3  end;
+  4  /
+PL/SQL 过程已成功完成。
+SQL> create table inter_table 
+  2  (id number, fid number, new_name varchar2(30), create_date date, comments varchar2(1000))
+  3  tablespace yangtk
+  4  partition by range (create_date) 
+  5  (partition p1 values less than (to_date('2005-1-1', 'yyyy-mm-dd')), 
+  6  partition p2 values less than (maxvalue));
+表已创建。
+SQL> alter table inter_table add constraint pk_inter_table primary key (id);
+表已更改。
+SQL> begin
+  2  dbms_redefinition.start_redef_table('yangtk', 'orgin_table', 'inter_table', 
+  3  'ID ID, FID FID, NAME NEW_NAME, CREATE_DATE CREATE_DATE, ''NO COMMENTS'' COMMENTS', 
+  4  DBMS_REDEFINITION.CONS_USE_PK);
+  5  END;
+  6  /
+PL/SQL 过程已成功完成。
+SQL> SELECT COUNT(*) FROM INTER_TABLE;
+  COUNT(*)
+----------
+      4034
+SQL> COL COMMENTS FORMAT A20
+SQL> ALTER SESSION SET NLS_DATE_FORMAT = 'YYYY-MM-DD HH24:MI:SS';
+会话已更改。
+SQL> SELECT * FROM INTER_TABLE WHERE ID = 1;
+        ID        FID NEW_NAME     CREATE_DATE         COMMENTS
+---------- ---------- ------------ ------------------- --------------------
+         1          1 ACCESS$      2004-10-18 16:14:23 NO COMMENTS
+SQL> INSERT INTO ORGIN_TABLE 
+  2  SELECT 4034+ROWNUM, 4034+ROWNUM, OBJECT_NAME, CREATED FROM DBA_OBJECTS
+  3  WHERE OWNER = 'SYSTEM';
+已创建404行。
+SQL> COMMIT;
+提交完成。
+SQL> begin
+  2  dbms_redefinition.sync_interim_table('yangtk', 'orgin_table', 'inter_table');
+  3  end;
+  4  /
+PL/SQL 过程已成功完成。
+SQL> select count(*) from INTER_TABLE;
+  COUNT(*)
+----------
+      4438
+SQL> alter table inter_table add constraint fk_inter_primary_id foreign key (fid) 
+  2  references test_primary (id) disable;
+表已更改。
+SQL> create index ind_inter_table_date on inter_table(create_date);
+索引已创建。
+SQL> create index ind_inter_table_fid on inter_table(fid);
+索引已创建。
+SQL> create or replace trigger tr_inter_table 
+  2  before insert on inter_table for each row 
+  3  begin
+  4  null;
+  5  end;
+  6  /
+触发器已创建
+SQL> begin
+  2  dbms_redefinition.finish_redef_table('yangtk', 'orgin_table', 'inter_table');
+  3  end;
+  4  /
+PL/SQL 过程已成功完成。
+SQL> desc orgin_table
+ 名称                            是否为空? 类型
+ ------------------------------- -------- ---------------
+ ID                              NOT NULL NUMBER
+ FID                                      NUMBER
+ NEW_NAME                                 VARCHAR2(30)
+ CREATE_DATE                              DATE
+ COMMENTS                                 VARCHAR2(1000)
+SQL> select table_name, partition_name from user_tab_partitions where table_name = 'ORGIN_TABLE';
+TABLE_NAME                     PARTITION_NAME
+------------------------------ ------------------------------
+ORGIN_TABLE                    P1
+ORGIN_TABLE                    P2
+SQL> select table_name, constraint_name, status from user_constraints 
+  2  where table_name in ('ORGIN_TABLE', 'INTER_TABLE');
+TABLE_NAME           CONSTRAINT_NAME            STATUS
+-------------------- -------------------------- --------
+INTER_TABLE          PK_ORGIN_TABLE             ENABLED
+INTER_TABLE          F_ORGIN_PRIMARY_ID         DISABLED
+ORGIN_TABLE          PK_INTER_TABLE             ENABLED
+ORGIN_TABLE          FK_INTER_PRIMARY_ID        ENABLED
+SQL> SELECT COUNT(*) FROM ORGIN_TABLE;
+  COUNT(*)
+----------
+      4438
+SQL> SELECT COUNT(*) FROM INTER_TABLE;
+  COUNT(*)
+----------
+      4438
+SQL> DROP TABLE INTER_TABLE;
+表已丢弃。
+

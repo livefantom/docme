@@ -1,0 +1,4 @@
+sigact.sa_mask;	// 信号处理函数执行期间要block的额外的信号。不应包含SIGKILL和SIGSTOP。
+
+
+为了防止不可重入函数调用中断的错误发生，应用程序应该通过阻塞相应的(appropriate)信号或使用一些programmatic信号量，来保护这些函数调用，
