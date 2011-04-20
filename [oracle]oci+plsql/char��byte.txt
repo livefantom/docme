@@ -1,0 +1,96 @@
+Oracle Varchar的参数(byte和char)2009-09-14 23:17我们知道在MS SQL中CHAR(N)或VARCHAR(N)的N是指Bytes，而不是字符的个数，那么在 oracle 中（CHAR或VARCHAR2），这个N到底是字符的个数还是字节长度？
+在 oracle 中这个N既可以是Bytes也可以是Characters，那么如何去指定它是哪一种呢？有两种方法：
+1.在CHAR或VARCHAR2中明确指定
+如：CHAR(10 CHAR),VARCHAR2(20 CHAR),CHAR(10 BYTE),VARCHAR2(20 BYTE)
+2.在初始化参数中指定
+可以在初始化参数中指定NLS_LENGTH_SEMANTICS=’CHAR’或’BYTE’来确定
+默认情况下这个参数是BYTE
+
+
+
+
+
+
+2 下面进行sqlplus的测试，使用scott/tiger帐号。
+
+SQL> create table test(name varchar(5 byte),namec varchar(5 char));
+
+表已创建。
+
+SQL> insert into test(name) values('12345');
+
+已创建 1 行。
+
+SQL> insert into test(name) values('123456'); 
+insert into test(name) values('123456') 
+                              * 
+第 1 行出现错误: 
+ORA-12899: 列 "SCOTT"."TEST"."NAME" 的值太大 (实际值: 6, 最大值: 5)
+
+
+SQL> insert into test(name) values('天津');
+
+已创建 1 行。
+
+SQL> insert into test(name) values('天津市'); 
+insert into test(name) values('天津市') 
+                              * 
+第 1 行出现错误: 
+ORA-12899: 列 "SCOTT"."TEST"."NAME" 的值太大 (实际值: 6, 最大值: 5)
+
+
+SQL> insert into test(namec) values('12345');
+
+已创建 1 行。
+
+SQL> insert into test(namec) values('123456'); 
+insert into test(namec) values('123456') 
+                               * 
+第 1 行出现错误: 
+ORA-12899: 列 "SCOTT"."TEST"."NAMEC" 的值太大 (实际值: 6, 最大值: 5)
+
+
+SQL> insert into test(namec) values('天津');
+
+已创建 1 行。
+
+SQL> insert into test(namec) values('天津市');
+
+已创建 1 行。
+
+SQL> insert into test(namec) values('天津市北京');
+
+已创建 1 行。
+
+SQL> insert into test(namec) values('天津市北京市'); 
+insert into test(namec) values('天津市北京市') 
+                               * 
+第 1 行出现错误: 
+ORA-12899: 列 "SCOTT"."TEST"."NAMEC" 的值太大 (实际值: 6, 最大值: 5)
+
+
+SQL> select * from test;
+
+NAME NAMEC 
+----- ---------- 
+12345 
+天津 
+      12345 
+      天津 
+      天津市 
+      天津市北京
+
+已选择6行。
+
+SQL>
+
+
+3 分析
+由于一个汉字在我的GBK系统里占用2个字节，所以byte的只能插入2个汉字，而char的可以插入5个汉字。 
+所以byte 就是字节数，对于汉字，GBK占用2个字节，如果是UTF-8则占用3个字节。
+
+为了充分利用4000个的上限，给自己减少麻烦，建议存储含有中文文字的字段时，采用char类型。
+
+
+本文来自CSDN博客，转载请标明出处：http://blog.csdn.net/java2000_net/archive/2009/02/10/3872643.aspx
+ 

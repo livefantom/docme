@@ -1,0 +1,16 @@
+Connection* conn = env->createConnection();
+Statement* stmt = conn->createStatement();
+---------------方式一------------------
+stmt->setSQL("select field1, field2, ... from tb_xxx where condition1 ...");
+ResultSet* rs = stmt->executeQuery();
+---------------方式二------------------
+stmt->setSQL(":1 := PKG_XXX.function(input1, input2, ... , :2)");
+stmt->registerOutParam(1, OCCIINT);
+stmt->registerOutParam(2, OCCICURSOR);
+stmt->execute();
+retcode = stmt->getInt(1);
+ResultSet* rs = stmt->getCursor(2);
+---------------------------------------
+value1 = rs->getXXX(1);
+value2 = rs->getXXX(2);
+...

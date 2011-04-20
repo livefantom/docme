@@ -1,0 +1,8 @@
+索引改名：
+ALTER INDEX index_1 RENAME TO index_2;
+
+主键改名：
+ALTER TABLE table_1 RENAME CONSTRAINT key_1 TO key_2;
+ALTER INDEX key_1 RENAME TO key_2;
+
+

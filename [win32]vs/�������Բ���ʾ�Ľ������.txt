@@ -1,0 +1,31 @@
+Failed to create .NET Frameworks PropertyGrid component.(工程属性不显示 的解决方案) 收藏 
+问题提示:
+
+---------------------------------------------------------------------------------------------------------
+
+Failed to create .NET Frameworks PropertyGrid component.
+Please verify that the common language runtime and .NET frameworks are properly installed.
+
+直接的解决方案:
+
+---------------------------------------------------------------------------------------------------------
+
+　．命令行的位置：开始菜单---->全部程序----->vs2005--->tools---->命令行 
+
+　．输入:　devenv /resetskippkgs
+
+　．再重新启动一次
+
+更详细的资料解决方案:
+
+---------------------------------------------------------------------------------------------------------
+
+Please try to repair your .NET Framework 2.0/3.0 within your Vista: How to repair the .NET Framework 2.0 and 3.0 on Windows Vista: http://blogs.msdn.com/astebner/archive/2007/03/26/how-to-repair-the-net-framework-2-0-and-3-0-on-windows-vista.aspx
+
+And FYI: .NET Framework 3.5 Installation validation tool: http://blogs.msdn.com/aaronru/archive/2007/11/29/net-framework-3-5-installation-validation-tool.aspx
+
+ 
+
+After .NET Framework is repaired, run the command line: devenv /resetskippkgs to fix the error.
+
+本文来自CSDN博客，转载请标明出处：http://blog.csdn.net/bloodsucker/archive/2009/04/22/4099560.aspx

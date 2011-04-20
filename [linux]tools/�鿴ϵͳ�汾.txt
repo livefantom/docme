@@ -1,0 +1,9 @@
+查看内核版本
+uname
+
+查看OS版本
+cat /etc/redhat-release
+
+# lsb_release -a
+
+# rpm -q redhat-release

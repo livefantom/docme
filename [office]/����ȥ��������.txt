@@ -1,0 +1,16 @@
+帮老师做个资料整理，网上直接复制过来的资料都带有超链接，怎么批量删除这些超链接呢？其实用个简单的宏就可以很容易实现！
+
+在Excel中
+ActiveSheet.Hyperlinks.Delete 
+
+在Word中
+For Each link In ActiveDocument.Hyperlinks
+link.Delete
+Next
+
+在PowerPoint中
+For Each link In ActiveWindow.Selection.SlideRange.Hyperlinks
+link.Delete
+Next 
+
+使用方法：新建宏——在Sub和End sub之间写入上面对应语句——选择需要去除超链接的单元格——执行这个宏

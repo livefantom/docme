@@ -1,0 +1,39 @@
+alan_oracle
+02-22-2007, 10:52 AM
+I would like to code a pl/sql for loop which stresses my cpu approximately 5%.
+
+Without sleep the cpu is fully stressed 100%.
+So my sleep in the loop should be very small.
+
+I only know these two Packages.
+
+execute dbms_lock.sleep(0.05);
+execute user_lock.sleep(5);
+
+But their precision is 1/100 second so it doesn't fit my needs.
+
+Does anyone know a alternative with a precision around microseconds?
+
+----------------------------------
+
+
+A dummy loop will help:
+
+
+SQL> declare
+2 J NUMBER;
+3 begin
+4 FOR J in 1..100 LOOP
+5 NULL;
+6 END LOOP;
+7 end;
+8 /
+
+PL/SQL procedure successfully completed.
+
+
+
+Tamil
+www.oracleact.com
+
+------------------------------------

@@ -1,0 +1,115 @@
+oracle & 和 ' 特殊字符处理 ( like 'GAC\&_%' escape '&'; 这里面的 \ 居然将& 转义了 为什么?) 收藏
+今天在导入一批数据到Oracle时，碰到了一个问题：Toad提示（plsql 也一样）要给一个自定义变量AMP赋值，一开始我很纳闷，数据是一系列的Insert语句，怎么会有自定义变量呢？后来搜索了一下关键字AMP发现，原来是因为在插入数据中有一个字段的内容如下：
+
+http://mobile.three.com.hk/3DX?uid=0676&amp;sid=rt_060908
+
+Oracle把这里的URL的参数连接符&amp;当成是一个自定义变量了，所以要求我给变量AMP赋值。怎么办呢？方法有三：
+
+处理 & 字符
+·方法一：在要插入的SQL语句前加上Set define off;与原SQL语句一起批量执行
+
+  我们在SQL*PLUS下执行 SQL> show all命令时，可以发现一个参数：define "&" (hex 26)，如下图所示
+
+  ......
+  concat "." (hex 2e)
+  copycommit 0
+  copytypecheck ON
+  define "&" (hex 26)
+  describe DEPTH 1 LINENUM OFF INDENT OFF
+  echo OFF
+  ......
+
+  这个是Oracle里面用来识别自定义变量的设置，现在我们在SQL*PLUS下将其关闭：
+
+  SQL> Set define OFF;
+
+  然后再次执行导入脚本，OK！问题搞定。
+
+  注意：如果是在TOAD（plsql 也一样）中执行，建议在每一个要导入的脚本第一行加上前面那句关闭define的话，否则当你导入第二个含有特殊字符的脚本的时候，又会出错。
+          如果是在SQL*PLUS中执行，则只需要设置一次define OFF，后面就可以连续导入了。直到你重新设置define ON为止。
+
+SET DEFINE OFF 的用法; 
+在SQL*Plus中默认的"&"表示替代变量，也就是说，只要在命令中出现该符号，SQL*Plus就会要你输入替代值。这就意味着你无法将一个含有该符号的字符串输入数据库或赋给变量，如字符串“SQL&Plus”系统会理解为以“SQL”打头的字符串，它会提示你输入替代变量Plus的值，如果你输入ABC，则最终字符串转化为“SQLABC”。 
+set define off 则关闭该功能，“&”将作为普通字符，如上例，最终字符就为“SQL&Plus” 
+set define off关闭替代变量功能 
+set define on 开启替代变量功能 
+set define *  将默认替代变量标志符该为“*”(也可以设为其它字符)
+
+·方法二：在SQL语句中将'&'替换成chr(38)，因为chr(38)是‘&’的ASCII码
+
+   SQL> Select 'Tom' || chr(38) || 'Jerry' from dual;
+
+·方法三：分拆原来的字符串
+
+   SQL> Select 'Tom' || '&' || 'Jerry' from dual;
+
+
+我们可以看到，方法一最为简便，而且效率也最高。方法二因为有一个调用函数的过程，所以性能稍差。方法三需要两次连接字符串，效率最差！
+
+处理 ' 字符
+
+那么如果字段的内容中包含了单引号要怎么插入呢？例如：It's fine。方法同样有三
+
+·方法一：使用转义字符
+
+   SQL > Select 'test' || '''' from dual;
+
+   注意：这里的''''四个单引号是什么意思呢？首先第一个和最后一个都是Oracle中的字符串连接符，这个没有异议。那么第二个'和第三'又表示什么意思呢？第二个'是一个转义字符
+           第三个'才是我们真正的内容
+
+·方法二：同样是使用转义字符，只不过方式不同而已
+
+   SQL > Select 'test ''' from dual;
+
+   注意：这里的第二个，第三个'就是我们上面方法一中提到的转义符和真正的内容
+
+·方法三：在SQL中将'替换成chr(39)，因为chr(39)是'的ASCII码
+
+   SQL > Select 'It' || chr(39) || 'fine' from dual;
+
+以上  转自:http://lichangwei.javaeye.com/?page=3&show_full=true (本文稍作了修改)
+
+以上的 ' 转义字符,只能转变 ' 的意思,或者说' 只能转变 ' 为字符,不能对其他字符进行转义  如通配符的转义
+
+通配符的转义
+通配符的转义没有专门的字符,或者说,统配符的转义字符用 关键字: ESCAPE 指定, 
+
+如下面的t  为转义字符,
+
+SQL> select * from user_tables where table_name like 'GACt_%' escape 't';
+
+TABLE_NAME                     TABLESPACE_NAME                CLUSTER_NAME                   
+------------------------------ ------------------------------ ------------------------------ 
+GAC_NITIN                      SYSTEM                                                       
+
+而 ' 也可以指定为 通配符的转义字符 (必须先通过 ' 将 ' 转义)
+
+SQL> select * from user_tables where table_name like 'GAC''_%' escape '''';
+
+TABLE_NAME                     TABLESPACE_NAME                CLUSTER_NAME                  
+------------------------------ ------------------------------ ------------------------------
+GAC_NITIN                      SYSTEM                                                      
+
+以上两种情况可以理解,下面两种情况却费解了,
+
+下面这条语句执行时,没有弹出对话框,也就是说plsql 没有将 & 当作表示替代变量的符号, 是 \ 将其转义了吗? 为什么 \ 能将其转义? escape 指定的不是 \ 啊? 为什么他还能转义?
+
+SQL> select * from user_tables where table_name like 'GAC\&_%' escape '&';
+
+TABLE_NAME                     TABLESPACE_NAME                CLUSTER_NAME  
+------------------------------ ------------------------------ --------------
+GAC_NITIN                      SYSTEM                                      
+
+而下面的语句在执行是却弹出对话框要求为 _ 赋替代值, 这是否能说明 escape 没有将其转义, 还是因为到第一个& 时还不知道 escape
+
+已经期指定为:转义字符?
+
+ SQL> select * from user_tables where table_name like 'GAC&_%' escape '&';
+
+TABLE_NAME                     TABLESPACE_NAME                CLUSTER_NAME    
+------------------------------ ------------------------------ ----------------
+GAC_NITIN                      SYSTEM                                        
+
+很奇怪,  like 'GAC\&_%' escape '&';  这里面的 \ 居然将& 转义了 为什么?
+
+ 这些可能涉及到闭包之类的知识(隐隐约约记得编译原理老师讲过)  当初没学会, 现在要加倍努力!

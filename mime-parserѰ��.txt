@@ -1,0 +1,88 @@
+Simple C++ MIME parser
+
+
+0
+
+I want to digest a multipart response in C++ sent back from a PHP script. Anyone know of a very lightweight MIME parser which can do this for me?
+
+Regards
+
+Robert
+
+c++ mime parsers
+flag
+asked Oct 20 '08 at 11:23
+R.A
+2,871¡ñ2¡ñ9¡ñ33
+
+75% accept rate
+5 Answersoldestnewestvotes
+
+2
+
+How about
+
+ScalingWeb's open source parser ?
+
+"very lightweight" combined with MIME is usually a bad combination. MIME is a very complex standard with book-length RFCs behind it. It's like wanting a "lightweight XML parser". That won't happen either.
+
+link|flag
+answered Oct 20 '08 at 11:49
+Thorsten79
+4,270¡ñ1¡ñ6¡ñ19
+
+ 
+1
+	
+VMime?
+
+link|flag
+answered Oct 20 '08 at 12:16
+Igor Semenov
+788¡ñ1¡ñ5
+vmime.org is not responding from where I am right now (Oregon), but the SourceForge project is visible: sourceforge.net/projects/vmime ¨C Don Wakefield Mar 27 at 14:33
+ 
+1
+	
+I know this may be too little, too late, but I had a similar need. I wanted a mime parser that just did the encoding and decoding of the MIME. For the sake of completeness and for Google-ability I thought I should put my findings here. Keep in mind that I was not interested in send and receiving mail, just encoding and decode MIME. Here are the libraries I researched for C++ MIME:
+
+http://www.vmime.org/ - Looks like too much. Contains pop, SMTP, tls, IMAP, could remove this. Posix and windows.
+
+http://codesink.org/mimetic_mime_library.html - looks promising. Very nice api for reading in and creating messages. Went with this one. Not too heavy. Had to ¡°fix¡± 2 things. First for multipart the code was just check for the string ¡°multipart¡± and did not recognize ¡°multipart/mixed¡± and did not write out the parts. Secondly, I had to hack the mimeentity write code. It was just writing out the std::deque Field and since these are strings it seem to be doing so alphabetically. This is problem because the MIME-version has to be the first field written out. So I fixed this. I also had to add support for Content-Length.
+
+http://www.mozilla.org/mailnews/arch/libmime-description.html - Hard time finding this. Had to download the whole package. mailnews\mime\src
+
+http://www.example-code.com/vcpp/smime.asp - Didn¡¯t consider because it had no source code and was windows specific.
+
+http://www.scalingweb.com/mime_parser.php - Didn¡¯t consider because it depends on other stream library from author.
+
+http://httpd.apache.org/docs/2.2/mod/mod_mime.html - Couldn¡¯t find this C implementation.
+
+I chose Mimetic for my needs although I had to add a few things to it. None of the parsers I found handled the optional fields (Content-Length, etc..) very well. I also needed it to support multiple platforms (Windows, Linux, etc..)
+
+link|flag
+answered Mar 1 at 3:08
+bnantz
+31¡ñ3
+ 
+0
+	
+bnantz,
+
+it would be great if you could send me your patches so I can include them the next release of mimetic.
+
+link|flag
+answered Mar 27 at 14:20
+stefano
+1
+ 
+0
+	
+Not to toot my own horn here, but GMime is a very complete MIME parser written in C which can handle the Content-Length header. It also handles DOS and UNIX line-endings with ease, handles broken header charset encodings, doesn't require you to read the entire message into RAM, supports PGP/MIME, etc. It also has a very comprehensive set of unit tests that I use to prevent any regressions.
+
+People have been building it on Windows for quite a while now (under cygwin and/or mingw32 afaik), but the past week or so I've been spending time making Windows a first-class priority by setting up Visual C++ Project/Solution files and making sure everything builds.
+
+Figured I'd post even though you've already found a MIME parser just so other people who may have a similar question might see another option if the aforementioned solutions don't suit their needs.
+
+link|flag
+answered Apr 4 at 17:37

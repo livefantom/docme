@@ -1,0 +1,5 @@
+select 'drop table ' || object_name || ' cascade constraints;'
+  from user_objects
+ where object_type = 'TABLE'
+ order by created;
+

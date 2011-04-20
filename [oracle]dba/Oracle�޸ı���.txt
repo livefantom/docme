@@ -1,0 +1,3 @@
+修改表名：
+方法1：rename test to test1;
+方法2：alter table test1 rename to test;

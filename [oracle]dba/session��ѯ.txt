@@ -1,0 +1,14 @@
+select t.USERNAME,
+       t.STATUS,
+       t.OSUSER,
+       t.PROCESS,
+       t.MACHINE,
+       t.PORT,
+       t.PROGRAM,
+       t.MODULE,
+       t.LOGON_TIME,
+       t.LAST_CALL_ET,
+       t.SECONDS_IN_WAIT,
+       t.STATE
+  from sys.v_$session t
+ where t.PROGRAM = 'eRatingServer_agip1.D33517@ssrating.linekong.com';

@@ -1,0 +1,82 @@
+Linux 系统中如何安装配置ACE
+
+http://www.gnu.org可以下载ACE安装包，这里以ACE-5.6.tar.gz安装包作为示例
+
+1.设置$ACE_ROOT环境变量
+
+# vim /etc/profile 打开文件，在“export PATH USER….”之后增加内容：
+
+ACE_ROOT=/opt/ACE/ACE_wrappers
+
+export ACE_ROOT
+
+LD_LIBRARY_PATH=$ACE_ROOT/ace:$LD_LIBRARY_PATH
+
+export LD_LIBRARY_PATH
+
+保存退出，执行命令“source /etc/profile”.
+
+如果执行失败可以修改文本权限“chmod a+x /etc/profile”，然后再执行一遍。
+
+输入echo $ACE_ROOT,显示/opt/ACE/ACE_wrappers 则ok
+
+2.编译安装
+
+mkdir /home/my/ACE，然后将ACE-5.6.tar.gz放在此目录下（用cp命令拷贝或mv命令移动到此目录）。这个目录不是安装目录要和ACE_ROOT分开,ACE_ROOT将是我们的安装目标目录。
+
+从ACE-5.6.tar.gz压出单个文件ACE-install.sh：
+
+命令如下：tar –zxvf ACE-5.6.tar.gz ACE_wrappers/ACE-install.sh
+
+将这个文件拷贝到/home/my/ACE路径下，
+
+#mv $ACE_ROOT/ACE-install.sh .//.即为当前目录
+
+#vim ACE-install.sh 将文件打开
+
+修改内容如下：
+
+找到“MY_ACEDIR=${HOME}/aceconfig”，将其改成“MY_ACEDIR=/home/my/ACE”，就是改成我们自己建的、放有ACE-5.6.tar.gz文件的目录。
+
+找到“MY_ACE_CONFIG=config-sunos5.4-sunc++-4.x.h”，将其修改成“MY_ACE_CONFIG=config-linux.h”，即改成linux下的配置文件。
+
+找到“MY_ACE_GNU_MACROS=platform_sunos5_sunc++.GNU”，将其改成“MY_ACE_GNU_MACROS=platform_linux.GNU”。这个是各种操作系统平台下的GNU宏文件设置。文件修改完毕，保存退出“:wq”。
+
+在/home/my/ACE目录下执行./ACE-install.sh文件。如果不能执行，可以修改一下文件权限（chmod a+x ACE-install.sh）继续执行。
+
+ok，直到编译成功！
+
+注意：通过修改ACE-install.sh文件，就不需要手动创建$ACE_ROOT/ace/config.h以及$ACE_ROOT/include/makeinclude/platform_macros.GNU两个文件
+
+3.ACE代码示例
+
+将$ACE_ROOT/lib下的libACE.so,libACE.so.5.6.0拷贝到/usr/lib
+
+######demo.c######
+
+#include"ace/Log_Msg.h"
+
+int ACE_TMAIN(int argc,ACE_TCHAR *argv[])
+
+{
+
+ACE_TRACE("main");
+
+ACE_DEBUG((LM_INFO,ACE_TEXT("Hello,world!")));
+
+}
+
+g++ demo.c -o demo -lACE -L$ACE_ROOT/lib -I$ACE_ROOT/include
+
+编译通过之后，执行
+
+#./demo
+
+Hello,world!
+
+ok，ACE环境搭建结束 ！
+
+
+
+
+

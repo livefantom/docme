@@ -1,0 +1,2 @@
+如果是多个字段的key，drop单个column的时候会失败；
+单个字段的key，drop column，key就一起没了。

@@ -1,0 +1,125 @@
+POST /TimeService/TimeService.asmx HTTP/1.1
+Host: www.nanonull.com:80
+Content-Type: text/xml; charset=utf-8
+Content-Length: 343
+Accept: application/soap+xml, application/dime, multipart/related, text/*
+User-Agent: IBM Web Services Explorer
+Cache-Control: no-cache
+Pragma: no-cache
+SOAPAction: "http://www.Nanonull.com/TimeService/getCityTime"
+Connection: close
+
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:q0="http://www.Nanonull.com/TimeService/" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+<soapenv:Body>
+<q0:getCityTime>
+<q0:city>london</q0:city>
+</q0:getCityTime>
+</soapenv:Body>
+</soapenv:Envelope>
+
+
+---------------------------
+POST /TimeService/TimeService.asmx HTTP/1.1
+Host: www.nanonull.com:80
+Content-Type: text/xml; charset=utf-8
+Content-Length: 311
+Accept: application/soap+xml, application/dime, multipart/related, text/*
+User-Agent: IBM Web Services Explorer
+Cache-Control: no-cache
+Pragma: no-cache
+SOAPAction: "http://www.Nanonull.com/TimeService/getCityTime"
+Connection: close
+
+<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+<soap:Body>
+<getCityTime xmlns="http://www.Nanonull.com/TimeService/">
+<city>london</city>
+</getCityTime>
+</soap:Body>
+</soap:Envelope>
+
+
+
+------------------------------
+POST /TimeService/TimeService.asmx HTTP/1.1
+Host: www.nanonull.com:80
+Content-Type: text/xml; charset=utf-8
+Content-Length: 351
+Accept: application/soap+xml, application/dime, multipart/related, text/*
+User-Agent: IBM Web Services Explorer
+Cache-Control: no-cache
+Pragma: no-cache
+SOAPAction: "http://www.Nanonull.com/TimeService/getCityTime"
+Connection: close
+
+<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+<soap:Body>
+<getCityTime xmlns="http://www.Nanonull.com/TimeService/">
+<city>london</city>
+</getCityTime>
+</soap:Body>
+</soap:Envelope>
+
+--------------------------------
+POST /SrvCheckAccount.asmx HTTP/1.1
+Host: 180.148.130.1
+Content-Type: text/xml; charset=utf-8
+Cache-Control: no-cache
+Pragma: no-cache
+Content-Length: 447
+SOAPAction: "https://psp.gate.vn/CheckAccount"
+Connection: close
+
+<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+<soap:Body>
+<CheckAccount xmlns="https://psp.gate.vn/">
+<UserID>tdk01@fpt.net</UserID>
+<Password>e10adc3949ba59abbe56e057f20f883e</Password>
+<IP>190.168.1.1</IP>
+<GameID>300</GameID>
+</CheckAccount>
+</soap:Body>
+</soap:Envelope>
+
+
+HTTP/1.1 200 OK
+Connection: close
+Date: Mon, 23 Nov 2009 13:16:37 GMT
+Server: Microsoft-IIS/6.0
+X-Powered-By: ASP.NET
+X-AspNet-Version: 2.0.50727
+Cache-Control: private, max-age=0
+Content-Type: text/xml; charset=utf-8
+Content-Length: 371
+
+<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+<soap:Body>
+<CheckAccountResponse xmlns="https://psp.gate.vn/">
+<CheckAccountResult>0,10001080</CheckAccountResult>
+</CheckAccountResponse>
+</soap:Body>
+</soap:Envelope>
+
+-----------------------------------------
+POST /SrvCheckAccount.asmx HTTP/1.1
+Host: 180.148.130.1
+Content-Type: text/xml; charset=utf-8
+Cache-Control: no-cache
+Pragma: no-cache
+Content-Length: 447
+SOAPAction: "https://psp.gate.vn/CheckAccount"
+
+<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+<soap:Body>
+<CheckAccount xmlns="https://psp.gate.vn/">
+<UserID>ttk01@fpt.net</UserID>
+<Password>e10adc3949ba59abbe56e057f20f883e</Password>
+<IP>190.168.1.1</IP>
+<GameID>300</GameID>
+</CheckAccount>
+</soap:Body>
+</soap:Envelope>
