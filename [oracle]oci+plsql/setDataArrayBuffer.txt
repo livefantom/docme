@@ -1,7 +1,7 @@
 setDataBufferArray(
 	unsigned int paramIndex,
- void *buffer,
- Type type,
+	void *buffer,
+	Type type,
 	ub4 arraySize,		-- 数组（缓冲区）中（允许的）最大元素个数。[in]
 	ub4 *arrayLength,	-- 当前元素个数，数组（缓冲区）实际长度（rownum）。[out]
 	sb4 elementSize,	-- 每个元素的缓冲区大小。（最大允许接收长度）[in]

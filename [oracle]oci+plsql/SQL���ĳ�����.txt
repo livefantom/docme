@@ -1,3 +1,5 @@
-update语句，如果没有更新任何列，那么并不抛出异常（无论是空表还是有数据的表），而是%ROWCOUNT=0；
+update语句，如果没有更新任何列，那么并不抛出异常（无论是空表还是有数据的表），而是SQL%ROWCOUNT=0；
 
-select into语句，如果没有任何符合条件的列，将抛出NO_DATA_FOUND异常。需要使用exception来捕获。
+select into语句，如果没有任何符合条件的行，将抛出NO_DATA_FOUND异常。需要使用exception来捕获。
+select into clause在符合条件的结果超过一行，将抛出TOO_MANY_ROWS异常。
+select into clause当只有一行符合条件时，SQL%ROWCOUNT=1。
