@@ -1,0 +1,44 @@
+全局设置：
+ 下载并安装 Git
+  git config --global user.name "Your Name"
+  git config --global user.email fan2005@gmail.com
+        
+下一步：
+  mkdir docme
+  cd docme
+  git init
+  touch README
+  git add README
+  git commit -m 'first commit'
+  git remote add origin git@github.com:username/docme.git
+
+$ git remote add github git@github.com:username/docme.git
+
+  git push -u origin master
+      
+现有的 Git 仓库？
+  cd existing_git_repo
+  git remote add origin git@github.com:username/docme.git
+  git push -u origin master
+      
+导入现有的 Subversion 仓库？
+  点击此处
+      
+当你完成时：
+  继续
+
+创建主版本库
+  $ mkdir git
+  $ cd git
+  $ git init --bare test.git
+  Initialized empty Git repository in $(HOME)/git/test.git/
+  $ ls test.git/
+  branches  config  description  HEAD  hooks  info  objects  refs
+
+
+  $ git daemon --verbose --export-all --enable=receive-pack --base-path=$(HOME)/git/ &
+
+
+  $ cat /etc/services | grep "^git"
+  git             9418/tcp                        # git pack transfer service
+  git             9418/udp                        # git pack transfer service
